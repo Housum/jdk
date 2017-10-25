@@ -122,13 +122,7 @@ public interface Map<K,V> {
         V getValue();
 
         /**
-         * Replaces the value corresponding to this entry with the specified
-         * value (optional operation).  (Writes through to the map.)  The
-         * behavior of this call is undefined if the mapping has already been
-         * removed from the map (by the iterator's <tt>remove</tt> operation).
-         *
-         * @param value new value to be stored in this entry
-         * @return old value corresponding to the entry
+         * 替换旧值，返回旧值
          * @throws UnsupportedOperationException if the <tt>put</tt> operation
          *         is not supported by the backing map
          * @throws ClassCastException if the class of the specified value
@@ -145,34 +139,10 @@ public interface Map<K,V> {
 
         boolean equals(Object o);
 
-        /**
-         * Returns the hash code value for this map entry.  The hash code
-         * of a map entry <tt>e</tt> is defined to be: <pre>
-         *     (e.getKey()==null   ? 0 : e.getKey().hashCode()) ^
-         *     (e.getValue()==null ? 0 : e.getValue().hashCode())
-         * </pre>
-         * This ensures that <tt>e1.equals(e2)</tt> implies that
-         * <tt>e1.hashCode()==e2.hashCode()</tt> for any two Entries
-         * <tt>e1</tt> and <tt>e2</tt>, as required by the general
-         * contract of <tt>Object.hashCode</tt>.
-         *
-         * @return the hash code value for this map entry
-         * @see Object#hashCode()
-         * @see Object#equals(Object)
-         * @see #equals(Object)
-         */
         int hashCode();
 
         /**
-         * Returns a comparator that compares {@link Map.Entry} in natural order on key.
-         *
-         * <p>The returned comparator is serializable and throws {@link
-         * NullPointerException} when comparing an entry with a null key.
-         *
-         * @param  <K> the {@link Comparable} type of then map keys
-         * @param  <V> the type of the map values
-         * @return a comparator that compares {@link Map.Entry} in natural order on key.
-         * @see Comparable
+         * 返回根据Map的键对比的Comparable
          * @since 1.8
          */
         public static <K extends Comparable<? super K>, V> Comparator<Map.Entry<K,V>> comparingByKey() {
@@ -180,16 +150,7 @@ public interface Map<K,V> {
                 (c1, c2) -> c1.getKey().compareTo(c2.getKey());
         }
 
-        /**
-         * Returns a comparator that compares {@link Map.Entry} in natural order on value.
-         *
-         * <p>The returned comparator is serializable and throws {@link
-         * NullPointerException} when comparing an entry with null values.
-         *
-         * @param <K> the type of the map keys
-         * @param <V> the {@link Comparable} type of the map values
-         * @return a comparator that compares {@link Map.Entry} in natural order on value.
-         * @see Comparable
+        /** 同理
          * @since 1.8
          */
         public static <K, V extends Comparable<? super V>> Comparator<Map.Entry<K,V>> comparingByValue() {
@@ -198,16 +159,7 @@ public interface Map<K,V> {
         }
 
         /**
-         * Returns a comparator that compares {@link Map.Entry} by key using the given
-         * {@link Comparator}.
-         *
-         * <p>The returned comparator is serializable if the specified comparator
-         * is also serializable.
-         *
-         * @param  <K> the type of the map keys
-         * @param  <V> the type of the map values
-         * @param  cmp the key {@link Comparator}
-         * @return a comparator that compares {@link Map.Entry} by the key.
+         * 同理
          * @since 1.8
          */
         public static <K, V> Comparator<Map.Entry<K, V>> comparingByKey(Comparator<? super K> cmp) {
@@ -217,16 +169,7 @@ public interface Map<K,V> {
         }
 
         /**
-         * Returns a comparator that compares {@link Map.Entry} by value using the given
-         * {@link Comparator}.
-         *
-         * <p>The returned comparator is serializable if the specified comparator
-         * is also serializable.
-         *
-         * @param  <K> the type of the map keys
-         * @param  <V> the type of the map values
-         * @param  cmp the value {@link Comparator}
-         * @return a comparator that compares {@link Map.Entry} by the value.
+         * 同理
          * @since 1.8
          */
         public static <K, V> Comparator<Map.Entry<K, V>> comparingByValue(Comparator<? super V> cmp) {
@@ -237,58 +180,14 @@ public interface Map<K,V> {
     }
 
     // Comparison and hashing
-
-    /**
-     * Compares the specified object with this map for equality.  Returns
-     * <tt>true</tt> if the given object is also a map and the two maps
-     * represent the same mappings.  More formally, two maps <tt>m1</tt> and
-     * <tt>m2</tt> represent the same mappings if
-     * <tt>m1.entrySet().equals(m2.entrySet())</tt>.  This ensures that the
-     * <tt>equals</tt> method works properly across different implementations
-     * of the <tt>Map</tt> interface.
-     *
-     * @param o object to be compared for equality with this map
-     * @return <tt>true</tt> if the specified object is equal to this map
-     */
     boolean equals(Object o);
 
-    /**
-     * Returns the hash code value for this map.  The hash code of a map is
-     * defined to be the sum of the hash codes of each entry in the map's
-     * <tt>entrySet()</tt> view.  This ensures that <tt>m1.equals(m2)</tt>
-     * implies that <tt>m1.hashCode()==m2.hashCode()</tt> for any two maps
-     * <tt>m1</tt> and <tt>m2</tt>, as required by the general contract of
-     * {@link Object#hashCode}.
-     *
-     * @return the hash code value for this map
-     * @see Map.Entry#hashCode()
-     * @see Object#equals(Object)
-     * @see #equals(Object)
-     */
     int hashCode();
 
     // Defaultable methods
 
     /**
-     * Returns the value to which the specified key is mapped, or
-     * {@code defaultValue} if this map contains no mapping for the key.
-     *
-     * @implSpec
-     * The default implementation makes no guarantees about synchronization
-     * or atomicity properties of this method. Any implementation providing
-     * atomicity guarantees must override this method and document its
-     * concurrency properties.
-     *
-     * @param key the key whose associated value is to be returned
-     * @param defaultValue the default mapping of the key
-     * @return the value to which the specified key is mapped, or
-     * {@code defaultValue} if this map contains no mapping for the key
-     * @throws ClassCastException if the key is of an inappropriate type for
-     * this map
-     * (<a href="{@docRoot}/java/util/Collection.html#optional-restrictions">optional</a>)
-     * @throws NullPointerException if the specified key is null and this map
-     * does not permit null keys
-     * (<a href="{@docRoot}/java/util/Collection.html#optional-restrictions">optional</a>)
+     * 获得值，如果没有查询到，那么返回默认值
      * @since 1.8
      */
     default V getOrDefault(Object key, V defaultValue) {
