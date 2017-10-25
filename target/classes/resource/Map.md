@@ -5,61 +5,221 @@
  * 这个接口是替代Dictionary的
  * 2.接口提供了三种类型的视图：1，键 2值 3 键值对.
  * 3.map内部的顺序体现在他们的视图集合的Iterator的顺序，一些map是保证了顺序，比如：TreeMap,但是一些却不能保证顺序，比如:HashMap
+ * <p>The <tt>Map</tt> interface provides three <i>collection views</i>, which
+ * allow a map's contents to be viewed as a set of keys, collection of values,
+ * or set of key-value mappings.  The <i>order</i> of a map is defined as
+ * the order in which the iterators on the map's collection views return their
+ * elements.  Some map implementations, like the <tt>TreeMap</tt> class, make
+ * specific guarantees as to their order; others, like the <tt>HashMap</tt>
+ * class, do not.
+ *
+ * <p>Note: great care must be exercised if mutable objects are used as map
+ * keys.  The behavior of a map is not specified if the value of an object is
+ * changed in a manner that affects <tt>equals</tt> comparisons while the
+ * object is a key in the map.  A special case of this prohibition is that it
+ * is not permissible for a map to contain itself as a key.  While it is
+ * permissible for a map to contain itself as a value, extreme caution is
+ * advised: the <tt>equals</tt> and <tt>hashCode</tt> methods are no longer
+ * well defined on such a map.
+ *
+ * <p>All general-purpose map implementation classes should provide two
+ * "standard" constructors: a void (no arguments) constructor which creates an
+ * empty map, and a constructor with a single argument of type <tt>Map</tt>,
+ * which creates a new map with the same key-value mappings as its argument.
+ * In effect, the latter constructor allows the user to copy any map,
+ * producing an equivalent map of the desired class.  There is no way to
+ * enforce this recommendation (as interfaces cannot contain constructors) but
+ * all of the general-purpose map implementations in the JDK comply.
+ *
+ * <p>The "destructive" methods contained in this interface, that is, the
+ * methods that modify the map on which they operate, are specified to throw
+ * <tt>UnsupportedOperationException</tt> if this map does not support the
+ * operation.  If this is the case, these methods may, but are not required
+ * to, throw an <tt>UnsupportedOperationException</tt> if the invocation would
+ * have no effect on the map.  For example, invoking the {@link #putAll(Map)}
+ * method on an unmodifiable map may, but is not required to, throw the
+ * exception if the map whose mappings are to be "superimposed" is empty.
+ *
+ * <p>Some map implementations have restrictions on the keys and values they
+ * may contain.  For example, some implementations prohibit null keys and
+ * values, and some have restrictions on the types of their keys.  Attempting
+ * to insert an ineligible key or value throws an unchecked exception,
+ * typically <tt>NullPointerException</tt> or <tt>ClassCastException</tt>.
+ * Attempting to query the presence of an ineligible key or value may throw an
+ * exception, or it may simply return false; some implementations will exhibit
+ * the former behavior and some will exhibit the latter.  More generally,
+ * attempting an operation on an ineligible key or value whose completion
+ * would not result in the insertion of an ineligible element into the map may
+ * throw an exception or it may succeed, at the option of the implementation.
+ * Such exceptions are marked as "optional" in the specification for this
+ * interface.
+ *
+ * <p>Many methods in Collections Framework interfaces are defined
+ * in terms of the {@link Object#equals(Object) equals} method.  For
+ * example, the specification for the {@link #containsKey(Object)
+ * containsKey(Object key)} method says: "returns <tt>true</tt> if and
+ * only if this map contains a mapping for a key <tt>k</tt> such that
+ * <tt>(key==null ? k==null : key.equals(k))</tt>." This specification should
+ * <i>not</i> be construed to imply that invoking <tt>Map.containsKey</tt>
+ * with a non-null argument <tt>key</tt> will cause <tt>key.equals(k)</tt> to
+ * be invoked for any key <tt>k</tt>.  Implementations are free to
+ * implement optimizations whereby the <tt>equals</tt> invocation is avoided,
+ * for example, by first comparing the hash codes of the two keys.  (The
+ * {@link Object#hashCode()} specification guarantees that two objects with
+ * unequal hash codes cannot be equal.)  More generally, implementations of
+ * the various Collections Framework interfaces are free to take advantage of
+ * the specified behavior of underlying {@link Object} methods wherever the
+ * implementor deems it appropriate.
+ *
+ * <p>Some map operations which perform recursive traversal of the map may fail
+ * with an exception for self-referential instances where the map directly or
+ * indirectly contains itself. This includes the {@code clone()},
+ * {@code equals()}, {@code hashCode()} and {@code toString()} methods.
+ * Implementations may optionally handle the self-referential scenario, however
+ * most current implementations do not do so.
  */
 public interface Map<K,V> {
     // Query Operations
 
     /**
-     * 返回Map中元素的数量  如果大于 Integer.MAX_VALUE 那么返回Integer.MAX_VALUE
+     * Returns the number of key-value mappings in this map.  If the
+     * map contains more than <tt>Integer.MAX_VALUE</tt> elements, returns
+     * <tt>Integer.MAX_VALUE</tt>.
+     *
+     * @return the number of key-value mappings in this map
      */
     int size();
 
     /**
-     * 返回map是否为空
+     * Returns <tt>true</tt> if this map contains no key-value mappings.
+     *
+     * @return <tt>true</tt> if this map contains no key-value mappings
      */
     boolean isEmpty();
 
     /**
-     *  如果map包含了这个key，那么返回true，否者返回false，
-     *  如果类型不匹配，那么抛出ClassCastException(可选)
-     *  如果key为null，那么抛出NPE（可选，不允许为null的时候）
+     * Returns <tt>true</tt> if this map contains a mapping for the specified
+     * key.  More formally, returns <tt>true</tt> if and only if
+     * this map contains a mapping for a key <tt>k</tt> such that
+     * <tt>(key==null ? k==null : key.equals(k))</tt>.  (There can be
+     * at most one such mapping.)
+     *
+     * @param key key whose presence in this map is to be tested
+     * @return <tt>true</tt> if this map contains a mapping for the specified
+     *         key
+     * @throws ClassCastException if the key is of an inappropriate type for
+     *         this map
+     * (<a href="{@docRoot}/java/util/Collection.html#optional-restrictions">optional</a>)
+     * @throws NullPointerException if the specified key is null and this map
+     *         does not permit null keys
+     * (<a href="{@docRoot}/java/util/Collection.html#optional-restrictions">optional</a>)
      */
     boolean containsKey(Object key);
 
     /**
-     *  如果map的值包含给定value的话，那么返回true，或者返回false
-     *  如果类型不匹配，那么抛出ClassCastException(可选)
-     *  如果key为null，那么抛出NPE（可选，不允许为null的时候）
+     * Returns <tt>true</tt> if this map maps one or more keys to the
+     * specified value.  More formally, returns <tt>true</tt> if and only if
+     * this map contains at least one mapping to a value <tt>v</tt> such that
+     * <tt>(value==null ? v==null : value.equals(v))</tt>.  This operation
+     * will probably require time linear in the map size for most
+     * implementations of the <tt>Map</tt> interface.
+     *
+     * @param value value whose presence in this map is to be tested
+     * @return <tt>true</tt> if this map maps one or more keys to the
+     *         specified value
+     * @throws ClassCastException if the value is of an inappropriate type for
+     *         this map
+     * (<a href="{@docRoot}/java/util/Collection.html#optional-restrictions">optional</a>)
+     * @throws NullPointerException if the specified value is null and this
+     *         map does not permit null values
+     * (<a href="{@docRoot}/java/util/Collection.html#optional-restrictions">optional</a>)
      */
     boolean containsValue(Object value);
 
     /**
-     * 1.返回key对应的value，如果没有的话，那么返回null（大部分的情况下爱）
+     * Returns the value to which the specified key is mapped,
+     * or {@code null} if this map contains no mapping for the key.
      *
-     * 2.但是在一些的情况，map可能会允许null值的插入,那么返回null值并不能说明
-     *  map中不存在key对应的值，可以通过containKey来区分这两种情况
-     *  如果类型不匹配，那么抛出ClassCastException(可选)
-     *  如果key为null，那么抛出NPE（可选，不允许为null的时候）
+     * <p>More formally, if this map contains a mapping from a key
+     * {@code k} to a value {@code v} such that {@code (key==null ? k==null :
+     * key.equals(k))}, then this method returns {@code v}; otherwise
+     * it returns {@code null}.  (There can be at most one such mapping.)
+     *
+     * <p>If this map permits null values, then a return value of
+     * {@code null} does not <i>necessarily</i> indicate that the map
+     * contains no mapping for the key; it's also possible that the map
+     * explicitly maps the key to {@code null}.  The {@link #containsKey
+     * containsKey} operation may be used to distinguish these two cases.
+     *
+     * @param key the key whose associated value is to be returned
+     * @return the value to which the specified key is mapped, or
+     *         {@code null} if this map contains no mapping for the key
+     * @throws ClassCastException if the key is of an inappropriate type for
+     *         this map
+     * (<a href="{@docRoot}/java/util/Collection.html#optional-restrictions">optional</a>)
+     * @throws NullPointerException if the specified key is null and this map
+     *         does not permit null keys
+     * (<a href="{@docRoot}/java/util/Collection.html#optional-restrictions">optional</a>)
      */
     V get(Object key);
 
     // Modification Operations
 
     /**
-     * 1.在map中存放 key及value对，如果map中已经存在了key的记录，那么就将旧的值给覆盖掉
-     * 2.如果存在旧值，那么就返回。如果不存在的话，那么返回null（如果允许为null的情况，那么就需要
-     * 使用containsKey来区分这两种情况）
-     * 3. 如果不支持这个方法，那么抛出UnsupportedOperationException异常
-     *  如果类型不匹配，那么抛出ClassCastException(可选)
-     *  如果key或者value为null，那么抛出NPE（不允许为null的情况下）
-     * 如果参数的某些属性不符合，那么抛出IllegalArgumentException
+     * Associates the specified value with the specified key in this map
+     * (optional operation).  If the map previously contained a mapping for
+     * the key, the old value is replaced by the specified value.  (A map
+     * <tt>m</tt> is said to contain a mapping for a key <tt>k</tt> if and only
+     * if {@link #containsKey(Object) m.containsKey(k)} would return
+     * <tt>true</tt>.)
+     *
+     * @param key key with which the specified value is to be associated
+     * @param value value to be associated with the specified key
+     * @return the previous value associated with <tt>key</tt>, or
+     *         <tt>null</tt> if there was no mapping for <tt>key</tt>.
+     *         (A <tt>null</tt> return can also indicate that the map
+     *         previously associated <tt>null</tt> with <tt>key</tt>,
+     *         if the implementation supports <tt>null</tt> values.)
+     * @throws UnsupportedOperationException if the <tt>put</tt> operation
+     *         is not supported by this map
+     * @throws ClassCastException if the class of the specified key or value
+     *         prevents it from being stored in this map
+     * @throws NullPointerException if the specified key or value is null
+     *         and this map does not permit null keys or values
+     * @throws IllegalArgumentException if some property of the specified key
+     *         or value prevents it from being stored in this map
      */
     V put(K key, V value);
 
     /**
-     * 删除给定key的记录，并且返回value，如果不允许插入值为null的情况，那么
-     * 返回null表示不存在这个记录吗，否则返回被删除的值。如果允许值为null的话，那么
-     * 返回null并不能被认为不存在这个记录
+     * Removes the mapping for a key from this map if it is present
+     * (optional operation).   More formally, if this map contains a mapping
+     * from key <tt>k</tt> to value <tt>v</tt> such that
+     * <code>(key==null ?  k==null : key.equals(k))</code>, that mapping
+     * is removed.  (The map can contain at most one such mapping.)
+     *
+     * <p>Returns the value to which this map previously associated the key,
+     * or <tt>null</tt> if the map contained no mapping for the key.
+     *
+     * <p>If this map permits null values, then a return value of
+     * <tt>null</tt> does not <i>necessarily</i> indicate that the map
+     * contained no mapping for the key; it's also possible that the map
+     * explicitly mapped the key to <tt>null</tt>.
+     *
+     * <p>The map will not contain a mapping for the specified key once the
+     * call returns.
+     *
+     * @param key key whose mapping is to be removed from the map
+     * @return the previous value associated with <tt>key</tt>, or
+     *         <tt>null</tt> if there was no mapping for <tt>key</tt>.
+     * @throws UnsupportedOperationException if the <tt>remove</tt> operation
+     *         is not supported by this map
+     * @throws ClassCastException if the key is of an inappropriate type for
+     *         this map
+     * (<a href="{@docRoot}/java/util/Collection.html#optional-restrictions">optional</a>)
+     * @throws NullPointerException if the specified key is null and this
+     *         map does not permit null keys
+     * (<a href="{@docRoot}/java/util/Collection.html#optional-restrictions">optional</a>)
      */
     V remove(Object key);
 
@@ -67,17 +227,32 @@ public interface Map<K,V> {
     // Bulk Operations
 
     /**
-     * 将map中的所有的键值都拷贝到map中去，但是在插入过程中map修改的花，并没有定义
-     * 如果不支持这个方法，那么抛出UnsupportedOperationException异常
-     * 如果类型不匹配，那么抛出ClassCastException(可选)
-     * 如果key或者value为null，那么抛出NPE（不允许为null的情况下）
-     * 如果参数的某些属性不符合，那么抛出IllegalArgumentException
+     * Copies all of the mappings from the specified map to this map
+     * (optional operation).  The effect of this call is equivalent to that
+     * of calling {@link #put(Object,Object) put(k, v)} on this map once
+     * for each mapping from key <tt>k</tt> to value <tt>v</tt> in the
+     * specified map.  The behavior of this operation is undefined if the
+     * specified map is modified while the operation is in progress.
+     *
+     * @param m mappings to be stored in this map
+     * @throws UnsupportedOperationException if the <tt>putAll</tt> operation
+     *         is not supported by this map
+     * @throws ClassCastException if the class of a key or value in the
+     *         specified map prevents it from being stored in this map
+     * @throws NullPointerException if the specified map is null, or if
+     *         this map does not permit null keys or values, and the
+     *         specified map contains null keys or values
+     * @throws IllegalArgumentException if some property of a key or value in
+     *         the specified map prevents it from being stored in this map
      */
     void putAll(Map<? extends K, ? extends V> m);
 
     /**
-     * 清理所有的数据，如果不支持这个方法，那么抛出UnsupportedOperationException异常
-     * 
+     * Removes all of the mappings from this map (optional operation).
+     * The map will be empty after this call returns.
+     *
+     * @throws UnsupportedOperationException if the <tt>clear</tt> operation
+     *         is not supported by this map
      */
     void clear();
 
@@ -85,22 +260,54 @@ public interface Map<K,V> {
     // Views
 
     /**
-     * 返回map的键的集合,这个集合是一个视图，两边的修改都是相互的影响，当已经获得这个set的Iterator
-     * 之后，map修改的话并没有定义。这个set支持remove，removeAll，retainAll，clear
-     * ,这些操作都反映到map上，但是这个set并不支持add以及addAll方法
+     * Returns a {@link Set} view of the keys contained in this map.
+     * The set is backed by the map, so changes to the map are
+     * reflected in the set, and vice-versa.  If the map is modified
+     * while an iteration over the set is in progress (except through
+     * the iterator's own <tt>remove</tt> operation), the results of
+     * the iteration are undefined.  The set supports element removal,
+     * which removes the corresponding mapping from the map, via the
+     * <tt>Iterator.remove</tt>, <tt>Set.remove</tt>,
+     * <tt>removeAll</tt>, <tt>retainAll</tt>, and <tt>clear</tt>
+     * operations.  It does not support the <tt>add</tt> or <tt>addAll</tt>
+     * operations.
+     *
+     * @return a set view of the keys contained in this map
      */
     Set<K> keySet();
 
     /**
-     * 返回map的值的集合，这个集合是一个视图，两边的修改都是相互的影响，当已经获得这个set的Iterator
-     * 之后，map修改的话并没有定义。这个set支持remove，removeAll，retainAll，clear
-     * ,这些操作都反映到map上，但是这个set并不支持add以及addAll方法
+     * Returns a {@link Collection} view of the values contained in this map.
+     * The collection is backed by the map, so changes to the map are
+     * reflected in the collection, and vice-versa.  If the map is
+     * modified while an iteration over the collection is in progress
+     * (except through the iterator's own <tt>remove</tt> operation),
+     * the results of the iteration are undefined.  The collection
+     * supports element removal, which removes the corresponding
+     * mapping from the map, via the <tt>Iterator.remove</tt>,
+     * <tt>Collection.remove</tt>, <tt>removeAll</tt>,
+     * <tt>retainAll</tt> and <tt>clear</tt> operations.  It does not
+     * support the <tt>add</tt> or <tt>addAll</tt> operations.
+     *
+     * @return a collection view of the values contained in this map
      */
     Collection<V> values();
 
     /**
-     * 返回map中的全部的键值对，和前面的一样和map是相互影响的，并且支持remove，removeAll，retainAll，clear
-     * 但是不支持all以及addAll
+     * Returns a {@link Set} view of the mappings contained in this map.
+     * The set is backed by the map, so changes to the map are
+     * reflected in the set, and vice-versa.  If the map is modified
+     * while an iteration over the set is in progress (except through
+     * the iterator's own <tt>remove</tt> operation, or through the
+     * <tt>setValue</tt> operation on a map entry returned by the
+     * iterator) the results of the iteration are undefined.  The set
+     * supports element removal, which removes the corresponding
+     * mapping from the map, via the <tt>Iterator.remove</tt>,
+     * <tt>Set.remove</tt>, <tt>removeAll</tt>, <tt>retainAll</tt> and
+     * <tt>clear</tt> operations.  It does not support the
+     * <tt>add</tt> or <tt>addAll</tt> operations.
+     *
+     * @return a set view of the mappings contained in this map
      */
     Set<Map.Entry<K, V>> entrySet();
 
