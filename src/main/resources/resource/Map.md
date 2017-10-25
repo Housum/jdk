@@ -105,38 +105,19 @@ public interface Map<K,V> {
     Set<Map.Entry<K, V>> entrySet();
 
     /**
-     * A map entry (key-value pair).  The <tt>Map.entrySet</tt> method returns
-     * a collection-view of the map, whose elements are of this class.  The
-     * <i>only</i> way to obtain a reference to a map entry is from the
-     * iterator of this collection-view.  These <tt>Map.Entry</tt> objects are
-     * valid <i>only</i> for the duration of the iteration; more formally,
-     * the behavior of a map entry is undefined if the backing map has been
-     * modified after the entry was returned by the iterator, except through
-     * the <tt>setValue</tt> operation on the map entry.
-     *
+     * map中的键值对，Map中的方法Map.entrySet会返回这个Entry，这是唯一获取map中的Entry的方式，如果在已经
+     * 获取Entry的情况下修改了map，那么他的行为是没有被定义的
      * @see Map#entrySet()
-     * @since 1.2
      */
     interface Entry<K,V> {
+    
         /**
-         * Returns the key corresponding to this entry.
-         *
-         * @return the key corresponding to this entry
-         * @throws IllegalStateException implementations may, but are not
-         *         required to, throw this exception if the entry has been
-         *         removed from the backing map.
+         * 单个键值对的Key，如果获取过程中被map删除了，那么抛出IllegalStateException（可选）
          */
         K getKey();
 
         /**
-         * Returns the value corresponding to this entry.  If the mapping
-         * has been removed from the backing map (by the iterator's
-         * <tt>remove</tt> operation), the results of this call are undefined.
-         *
-         * @return the value corresponding to this entry
-         * @throws IllegalStateException implementations may, but are not
-         *         required to, throw this exception if the entry has been
-         *         removed from the backing map.
+         * 获得单个键值对的值，如果获取过程中被map删除了，那么抛出IllegalStateException（可选）
          */
         V getValue();
 
@@ -162,24 +143,6 @@ public interface Map<K,V> {
          */
         V setValue(V value);
 
-        /**
-         * Compares the specified object with this entry for equality.
-         * Returns <tt>true</tt> if the given object is also a map entry and
-         * the two entries represent the same mapping.  More formally, two
-         * entries <tt>e1</tt> and <tt>e2</tt> represent the same mapping
-         * if<pre>
-         *     (e1.getKey()==null ?
-         *      e2.getKey()==null : e1.getKey().equals(e2.getKey()))  &amp;&amp;
-         *     (e1.getValue()==null ?
-         *      e2.getValue()==null : e1.getValue().equals(e2.getValue()))
-         * </pre>
-         * This ensures that the <tt>equals</tt> method works properly across
-         * different implementations of the <tt>Map.Entry</tt> interface.
-         *
-         * @param o object to be compared for equality with this map entry
-         * @return <tt>true</tt> if the specified object is equal to this map
-         *         entry
-         */
         boolean equals(Object o);
 
         /**
