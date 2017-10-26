@@ -716,62 +716,14 @@ public interface Map<K,V> {
     }
 
     /**
-     * If the specified key is not already associated with a value or is
-     * associated with null, associates it with the given non-null value.
-     * Otherwise, replaces the associated value with the results of the given
-     * remapping function, or removes if the result is {@code null}. This
-     * method may be of use when combining multiple mapped values for a key.
-     * For example, to either create or append a {@code String msg} to a
-     * value mapping:
-     *
-     * <pre> {@code
-     * map.merge(key, msg, String::concat)
-     * }</pre>
-     *
-     * <p>If the function returns {@code null} the mapping is removed.  If the
-     * function itself throws an (unchecked) exception, the exception is
-     * rethrown, and the current mapping is left unchanged.
-     *
-     * @implSpec
-     * The default implementation is equivalent to performing the following
-     * steps for this {@code map}, then returning the current value or
-     * {@code null} if absent:
-     *
-     * <pre> {@code
-     * V oldValue = map.get(key);
-     * V newValue = (oldValue == null) ? value :
-     *              remappingFunction.apply(oldValue, value);
-     * if (newValue == null)
-     *     map.remove(key);
-     * else
-     *     map.put(key, newValue);
-     * }</pre>
-     *
-     * <p>The default implementation makes no guarantees about synchronization
-     * or atomicity properties of this method. Any implementation providing
-     * atomicity guarantees must override this method and document its
-     * concurrency properties. In particular, all implementations of
-     * subinterface {@link java.util.concurrent.ConcurrentMap} must document
-     * whether the function is applied once atomically only if the value is not
-     * present.
-     *
-     * @param key key with which the resulting value is to be associated
-     * @param value the non-null value to be merged with the existing value
-     *        associated with the key or, if no existing value or a null value
-     *        is associated with the key, to be associated with the key
-     * @param remappingFunction the function to recompute a value if present
-     * @return the new value associated with the specified key, or null if no
-     *         value is associated with the key
-     * @throws UnsupportedOperationException if the {@code put} operation
-     *         is not supported by this map
-     *         (<a href="{@docRoot}/java/util/Collection.html#optional-restrictions">optional</a>)
-     * @throws ClassCastException if the class of the specified key or value
-     *         prevents it from being stored in this map
-     *         (<a href="{@docRoot}/java/util/Collection.html#optional-restrictions">optional</a>)
-     * @throws NullPointerException if the specified key is null and this map
-     *         does not support null keys or the value or remappingFunction is
-     *         null
-     * @since 1.8
+     * 1.如果key的记录不存在话或者key对应的值为null，那么就将key对应的value作为键值对存入到map中去
+     * 2.否则使用BiFunction的返回值作为value代替原来的值，如果BiFunction返回的是null，那么在map中将记录删除
+     * BiFunction有两个参数，第一个参数为旧值  第二个参数为传入的新值
+     * 3.典型用法: map.merge(key, msg, String::concat)
+     * 如果不支持这个方法，那么抛出UnsupportedOperationException异常
+     * 如果类型不匹配，那么抛出ClassCastException(可选)
+     * 如果key或者value为null，那么抛出NPE（不允许为null的情况下）
+     * @since 1.8 
      */
     default V merge(K key, V value,
             BiFunction<? super V, ? super V, ? extends V> remappingFunction) {
