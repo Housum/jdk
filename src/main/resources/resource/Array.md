@@ -5,9 +5,6 @@
 都是native 相对于比较的高效
 
  ```
- 
- package java.lang.reflect;
- 
  public final class Array {
  
      /**
@@ -78,7 +75,7 @@
      public static native double getDouble(Object array, int index)
          throws IllegalArgumentException, ArrayIndexOutOfBoundsException;
          
-      //获取值
+      //设置值
      public static native void set(Object array, int index, Object value)
          throws IllegalArgumentException, ArrayIndexOutOfBoundsException;
  
