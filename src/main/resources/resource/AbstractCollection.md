@@ -1,5 +1,5 @@
 ###Collection 接口的骨架实现，大部分的集合都会继承这个抽象类
-1. 这个接口完成了大部分的基础功能，需要注意的是虽然实现了add(E)方法，但是默认是抛出了UnSupportOperationException异常
+1. 这个接口完成了大部分的基础功能，需要注意的是虽然实现了add(E)方法，但是默认是抛出了UnsupportedOperationException异常
 这是因为很多的集合都不支持add操作（不可变的集合）.
 2. 其他的基础类都是基于抽象方法实现的,所以关于抽象方法的实现至关重要.主要是size(),iterator()(大部分的元素查找都是
 基于这个做的)
@@ -166,7 +166,7 @@ public abstract class AbstractCollection<E> implements Collection<E> {
 
     /**
      * 这个方法是通过集合的Iterator的遍历每一个元素,如果找到给定的元素那么调用Iterator
-     * 的删除方法,将元素给删除掉，如果Iterator不支持remove方法的话,那么抛出unsupportOperationException异常
+     * 的删除方法,将元素给删除掉，如果Iterator不支持remove方法的话,那么抛出unsupportedOperationException异常
      * 关于抛出的异常可以查看Collection的定义
      */
     public boolean remove(Object o) {
@@ -207,7 +207,7 @@ public abstract class AbstractCollection<E> implements Collection<E> {
 
     /**
      * 将参数的集合c全部插入到集合中,注意只要一个元素插入成功,那么就会返回true，只有在
-     * 增加全部失败的时候才会返回false，如果集合不支持add方法,那么抛出unsupportOperationException
+     * 增加全部失败的时候才会返回false，如果集合不支持add方法,那么抛出unsupportedOperationException
      * @see #add(Object)
      */
     public boolean addAll(Collection<? extends E> c) {
@@ -221,7 +221,7 @@ public abstract class AbstractCollection<E> implements Collection<E> {
     /**
      * 遍历给定的集合c,查看本集合是否包含c中的元素,如果包含的话，那么使用Iterator的remove方法
      * 删除元素，注意只需要删除成功一个就会返回true，如果Iterator不支持remove,那么将会抛出
-     * unsupportOperationException
+     * unsupportedOperationException
      * @see #remove(Object)
      * @see #contains(Object)
      */
@@ -240,7 +240,7 @@ public abstract class AbstractCollection<E> implements Collection<E> {
 
     /**
      * 求集合和给定的集合c的交集,如果集合的Iterator不支持remove方法
-     * 那么抛出unsupportOperationException异常
+     * 那么抛出unsupportedOperationException异常
      * @see #remove(Object)
      * @see #contains(Object)
      */
@@ -259,7 +259,7 @@ public abstract class AbstractCollection<E> implements Collection<E> {
 
     /**
      * 清理集合中的所有的元素,如果集合的Iterator不支持remove，那么将会抛出
-     * UnsupportOperationException异常
+     * UnsupportedOperationException异常
      */
     public void clear() {
         Iterator<E> it = iterator();
