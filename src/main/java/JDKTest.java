@@ -24,15 +24,11 @@ public class JDKTest {
 		list.add("2");
 		list.add("3");
 		list.add("4");
-
 		Collections.reverse(list);
+        log(list);
 
-		list.forEach(System.out::println);
-
-		System.out.println("++++++++++++++++++++++++++++++++++");
 		Collections.shuffle(list);
-
-		list.forEach(System.out::println);
+        log(list);
 
 		Collections.sort(list);
 		rotate2(list,1);
@@ -54,6 +50,8 @@ public class JDKTest {
 
         log(Collections.indexOfSubList(list,subList));
 
+
+        log(Collections.lastIndexOfSubList(list,subList));
 
 
 	}
