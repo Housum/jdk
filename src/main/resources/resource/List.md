@@ -1,6 +1,7 @@
 ### List 接口
 ```
 /*
+ * 方法后面有，‘<-’ 标示的为Collection没有的方法
  * @see Collection
  * @see Set
  * @see ArrayList
@@ -65,7 +66,7 @@ public interface List<E> extends Collection<E> {
 
     /**
      */
-    boolean addAll(int index, Collection<? extends E> c);
+    boolean addAll(int index, Collection<? extends E> c); <-
 
     /**
      */
@@ -121,7 +122,7 @@ public interface List<E> extends Collection<E> {
     /**
      * 获得指定索引的元素，如果超出的话，那么抛出IndexOutOfBoundsException
      */
-    E get(int index);
+    E get(int index); <-
 
     /**
      * 在指定索引处设置值
@@ -131,13 +132,13 @@ public interface List<E> extends Collection<E> {
      * 4.如果实现类不支持这个方法的话，那么抛出UnsupportedOperationException
      * 5. 如果参数为null，那么抛出NPE
      */
-    E set(int index, E element);
+    E set(int index, E element); <-
 
     /**
      * 将参数插入到指定的位置，同时因为subList的子序列只是一个视图，所以也会被改变
      * {@link set(..)}  出现这些情况下，都会抛出相同异常
      */
-    void add(int index, E element);
+    void add(int index, E element);<-
 
     /**
      */
@@ -149,12 +150,12 @@ public interface List<E> extends Collection<E> {
     /**
      * 返回第一个指定元素出现的问题在
      */
-    int indexOf(Object o);
+    int indexOf(Object o); <-
 
     /**
      * 最后的指定元素所在的位置，否则返回-1
      */
-    int lastIndexOf(Object o);
+    int lastIndexOf(Object o); <-
 
 
     // List Iterators
@@ -165,14 +166,14 @@ public interface List<E> extends Collection<E> {
 
     /**
      */
-    ListIterator<E> listIterator(int index);
+    ListIterator<E> listIterator(int index); <-
 
     // View
 
     /**
      * 返回一个子视图,这个字视图是使用的都是原本的list的元素，
      */
-    List<E> subList(int fromIndex, int toIndex);
+    List<E> subList(int fromIndex, int toIndex); <-
 
     /**
      * @since 1.8
