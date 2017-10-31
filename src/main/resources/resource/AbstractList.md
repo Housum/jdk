@@ -1,5 +1,5 @@
 ### AbstractList  List的骨架实现类
-这个基类和AbstractSequentialList 是同级的,这个接口适合随机存储的列表（like: ArrayList）
+这个接口适合随机存储的列表（like: ArrayList）
 ```
 
 /**
