@@ -10,22 +10,9 @@ package java.util;
  * 实现，提供了自己的实现以便实现适合自己的方法操作元素（
  * 主要是三个抽象方法:set(int index, E element),get(int index),remove(int index)）
  * 2.实现的ListIterator必须实现hasNext,next ，hasPrevious,previous 方法
- * 
- * For a modifiable list the programmer should additionally implement the list
- * iterator's <tt>set</tt> method.  For a variable-size list the programmer
- * should additionally implement the list iterator's <tt>remove</tt> and
- * <tt>add</tt> methods.<p>
- *
- * The programmer should generally provide a void (no argument) and collection
- * constructor, as per the recommendation in the <tt>Collection</tt> interface
- * specification.<p>
- *
- * This class is a member of the
- * <a href="{@docRoot}/../technotes/guides/collections/index.html">
- * Java Collections Framework</a>.
- *
- * @author  Josh Bloch
- * @author  Neal Gafter
+ * 3.如果实现的是一个可以被修改的列表,那么需要实现iterator的set方法如果实现的是一个可变
+ * 容量的列表,那么需要实现iterator的add以及remove方法
+ * 4.子类需要提供一个空的没有参数的构造函数(Collection 的规定)
  * @see Collection
  * @see List
  * @see AbstractList
@@ -35,20 +22,16 @@ package java.util;
 
 public abstract class AbstractSequentialList<E> extends AbstractList<E> {
     /**
-     * Sole constructor.  (For invocation by subclass constructors, typically
-     * implicit.)
+     * 唯一的构造器  子类需要调用（Collection的定义）
      */
     protected AbstractSequentialList() {
     }
 
     /**
-     * Returns the element at the specified position in this list.
-     *
-     * <p>This implementation first gets a list iterator pointing to the
-     * indexed element (with <tt>listIterator(index)</tt>).  Then, it gets
-     * the element using <tt>ListIterator.next</tt> and returns it.
-     *
-     * @throws IndexOutOfBoundsException {@inheritDoc}
+     * 获取指定索引的元素,在实现是先获得列表的ListIterator 然后调用next方法获得元素的
+     * 为什么这样实现? 因为这个基类是为了给顺序存储的列表实现的,那么查询元素时间复杂度为O(n)
+     * 那么底层的ListIterator就是按照遍历去查找的.（如果是随机储存的结构,那么就不需要遍历
+     * 只需要定位到指定的元素就可以了）
      */
     public E get(int index) {
         try {
@@ -59,23 +42,10 @@ public abstract class AbstractSequentialList<E> extends AbstractList<E> {
     }
 
     /**
-     * Replaces the element at the specified position in this list with the
-     * specified element (optional operation).
-     *
-     * <p>This implementation first gets a list iterator pointing to the
-     * indexed element (with <tt>listIterator(index)</tt>).  Then, it gets
-     * the current element using <tt>ListIterator.next</tt> and replaces it
-     * with <tt>ListIterator.set</tt>.
-     *
-     * <p>Note that this implementation will throw an
-     * <tt>UnsupportedOperationException</tt> if the list iterator does not
-     * implement the <tt>set</tt> operation.
-     *
-     * @throws UnsupportedOperationException {@inheritDoc}
-     * @throws ClassCastException            {@inheritDoc}
-     * @throws NullPointerException          {@inheritDoc}
-     * @throws IllegalArgumentException      {@inheritDoc}
-     * @throws IndexOutOfBoundsException     {@inheritDoc}
+     * 替换给定索引的元素(可选的操作)
+     * 1. 实现是首先获得列表的ListIterator ，然后遍历到指定索引的元素,然后调用
+     * 它的set方法替换元素
+     * 2.如果ListIterator没有实现set方法,那么将会抛出UOE
      */
     public E set(int index, E element) {
         try {
@@ -89,24 +59,8 @@ public abstract class AbstractSequentialList<E> extends AbstractList<E> {
     }
 
     /**
-     * Inserts the specified element at the specified position in this list
-     * (optional operation).  Shifts the element currently at that position
-     * (if any) and any subsequent elements to the right (adds one to their
-     * indices).
-     *
-     * <p>This implementation first gets a list iterator pointing to the
-     * indexed element (with <tt>listIterator(index)</tt>).  Then, it
-     * inserts the specified element with <tt>ListIterator.add</tt>.
-     *
-     * <p>Note that this implementation will throw an
-     * <tt>UnsupportedOperationException</tt> if the list iterator does not
-     * implement the <tt>add</tt> operation.
-     *
-     * @throws UnsupportedOperationException {@inheritDoc}
-     * @throws ClassCastException            {@inheritDoc}
-     * @throws NullPointerException          {@inheritDoc}
-     * @throws IllegalArgumentException      {@inheritDoc}
-     * @throws IndexOutOfBoundsException     {@inheritDoc}
+     * 1.将元素添加到指定索引的位置,原先的元素将会在新元素的右边
+     * 2.对于抛出的异常可以查看基类中的定义（AbstractList）
      */
     public void add(int index, E element) {
         try {
@@ -117,21 +71,8 @@ public abstract class AbstractSequentialList<E> extends AbstractList<E> {
     }
 
     /**
-     * Removes the element at the specified position in this list (optional
-     * operation).  Shifts any subsequent elements to the left (subtracts one
-     * from their indices).  Returns the element that was removed from the
-     * list.
-     *
-     * <p>This implementation first gets a list iterator pointing to the
-     * indexed element (with <tt>listIterator(index)</tt>).  Then, it removes
-     * the element with <tt>ListIterator.remove</tt>.
-     *
-     * <p>Note that this implementation will throw an
-     * <tt>UnsupportedOperationException</tt> if the list iterator does not
-     * implement the <tt>remove</tt> operation.
-     *
-     * @throws UnsupportedOperationException {@inheritDoc}
-     * @throws IndexOutOfBoundsException     {@inheritDoc}
+     * 1.将指定索引的元素进行删除,将右边的参数都往左边移动
+     * 2.实现的方式是首先通过ListIterator(index)获得ListIterator，然后在进行删除操作
      */
     public E remove(int index) {
         try {
@@ -147,7 +88,8 @@ public abstract class AbstractSequentialList<E> extends AbstractList<E> {
 
     // Bulk Operations
 
-    /**
+    /** 
+     * 将给定的集合都插入到
      * Inserts all of the elements in the specified collection into this
      * list at the specified position (optional operation).  Shifts the
      * element currently at that position (if any) and any subsequent
@@ -195,26 +137,14 @@ public abstract class AbstractSequentialList<E> extends AbstractList<E> {
     // Iterators
 
     /**
-     * Returns an iterator over the elements in this list (in proper
-     * sequence).<p>
-     *
-     * This implementation merely returns a list iterator over the list.
-     *
-     * @return an iterator over the elements in this list (in proper sequence)
      */
     public Iterator<E> iterator() {
         return listIterator();
     }
 
     /**
-     * Returns a list iterator over the elements in this list (in proper
-     * sequence).
-     *
-     * @param  index index of first element to be returned from the list
-     *         iterator (by a call to the <code>next</code> method)
-     * @return a list iterator over the elements in this list (in proper
-     *         sequence)
-     * @throws IndexOutOfBoundsException {@inheritDoc}
+     * 1.重新的覆盖基类的方法，因为在基类这个方法都是基于随机存储的,不太适合顺序存储
+     * 2.iterator() 方法最终也会调用这个方法获得ListIterator
      */
     public abstract ListIterator<E> listIterator(int index);
 }
