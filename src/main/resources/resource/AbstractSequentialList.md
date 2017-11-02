@@ -89,34 +89,11 @@ public abstract class AbstractSequentialList<E> extends AbstractList<E> {
     // Bulk Operations
 
     /** 
-     * 将给定的集合都插入到
-     * Inserts all of the elements in the specified collection into this
-     * list at the specified position (optional operation).  Shifts the
-     * element currently at that position (if any) and any subsequent
-     * elements to the right (increases their indices).  The new elements
-     * will appear in this list in the order that they are returned by the
-     * specified collection's iterator.  The behavior of this operation is
-     * undefined if the specified collection is modified while the
-     * operation is in progress.  (Note that this will occur if the specified
-     * collection is this list, and it's nonempty.)
-     *
-     * <p>This implementation gets an iterator over the specified collection and
-     * a list iterator over this list pointing to the indexed element (with
-     * <tt>listIterator(index)</tt>).  Then, it iterates over the specified
-     * collection, inserting the elements obtained from the iterator into this
-     * list, one at a time, using <tt>ListIterator.add</tt> followed by
-     * <tt>ListIterator.next</tt> (to skip over the added element).
-     *
-     * <p>Note that this implementation will throw an
-     * <tt>UnsupportedOperationException</tt> if the list iterator returned by
-     * the <tt>listIterator</tt> method does not implement the <tt>add</tt>
-     * operation.
-     *
-     * @throws UnsupportedOperationException {@inheritDoc}
-     * @throws ClassCastException            {@inheritDoc}
-     * @throws NullPointerException          {@inheritDoc}
-     * @throws IllegalArgumentException      {@inheritDoc}
-     * @throws IndexOutOfBoundsException     {@inheritDoc}
+     * 1.将给定的集合都插入到列表中,指定的索引及索引右边的元素都向右移动,被插入的元素
+     * 的顺序是集合的Iterator的顺序
+     * 2.方法的实现和前面的方式都是一样的,先获取ListIterator,然后通过它的add方法添加
+     * 元素
+     * 3.如果ListIterator没有实现add方法的话,那么将会抛出UOE
      */
     public boolean addAll(int index, Collection<? extends E> c) {
         try {
@@ -137,6 +114,9 @@ public abstract class AbstractSequentialList<E> extends AbstractList<E> {
     // Iterators
 
     /**
+     * 事实上最后调用的将是listIterator(index)
+     * 这里并没有继承AbstractList,这是因为AbstractList是适合于随机储存结构的列表,
+     * 但是不支持顺序储存的列表
      */
     public Iterator<E> iterator() {
         return listIterator();
