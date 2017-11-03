@@ -78,21 +78,6 @@ public interface Collection<E> extends Iterable<E> {
      */
     boolean removeAll(Collection<?> c);
 
-    /**
-     * @since 1.8
-     */
-    default boolean removeIf(Predicate<? super E> filter) {
-        Objects.requireNonNull(filter);
-        boolean removed = false;
-        final Iterator<E> each = iterator();
-        while (each.hasNext()) {
-            if (filter.test(each.next())) {
-                each.remove();
-                removed = true;
-            }
-        }
-        return removed;
-    }
 
     /**
      * 求交集
@@ -136,6 +121,7 @@ public interface Collection<E> extends Iterable<E> {
 
     /**
      * 返回一个顺序的序列 
+     * @since 1.8
      */
     default Stream<E> stream() {
         return StreamSupport.stream(spliterator(), false);
@@ -147,6 +133,22 @@ public interface Collection<E> extends Iterable<E> {
      */
     default Stream<E> parallelStream() {
         return StreamSupport.stream(spliterator(), true);
+    }
+    
+    /*
+     * @since 1.8
+     */
+    default boolean removeIf(Predicate<? super E> filter) {
+        Objects.requireNonNull(filter);
+        boolean removed = false;
+        final Iterator<E> each = iterator();
+        while (each.hasNext()) {
+            if (filter.test(each.next())) {
+                each.remove();
+                removed = true;
+            }
+        }
+        return removed;
     }
 }
 

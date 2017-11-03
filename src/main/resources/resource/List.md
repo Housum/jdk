@@ -141,8 +141,9 @@ public interface List<E> extends Collection<E> {
     void add(int index, E element);<-
 
     /**
+     * 和Collection的区别在于 Collection参数是obj
      */
-    E remove(int index);
+    E remove(int index); <-
 
 
     // Search Operations

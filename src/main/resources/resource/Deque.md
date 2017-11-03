@@ -1,4 +1,5 @@
 ### Deque 接口
+
 ```
 /**
  * 双端队列，一般情况，都是一个没有长度限制的，但是实现类可以选择性的
@@ -7,7 +8,7 @@
  */
 public interface Deque<E> extends Queue<E> {
     /**
-     *  插入元素到对首，如果不能插入，则抛出IllegalStateException异常
+     *  插入元素到队首，如果不能插入，则抛出IllegalStateException异常
      */
     void addFirst(E e);
 
@@ -47,25 +48,27 @@ public interface Deque<E> extends Queue<E> {
     E pollLast();
 
     /**
-     * @throws NoSuchElementException if this deque is empty
+     * 类似于Queue的element 查看队首的元素，如果不存在那么抛出NoSuchElementException
      */
     E getFirst();
 
     /**
-     * @throws NoSuchElementException if this deque is empty
+     *类似于Queue的element 查看队尾的元素，如果不存在那么抛出NoSuchElementException
      */
     E getLast();
 
     /**
+     * 从队首查看数据
      */
     E peekFirst();
 
     /**
+     * 从队尾查看数据
      */
     E peekLast();
 
     /**
-     * 删除离队首最近的元素，如果不存在，那么队列不在任何的改变，
+     * 删除离队首最近的元素，如果不存在，那么队列不做任何的改变，
      * 删除成功的话，返回true
      */
     boolean removeFirstOccurrence(Object o);
@@ -76,62 +79,55 @@ public interface Deque<E> extends Queue<E> {
      */
     boolean removeLastOccurrence(Object o);
 
-    // *** Queue methods ***
+    // *** 继承 Queue 的方法 ***
 
     /**
-     *
-     * <p>This method is equivalent to {@link #addLast}.
+     * 相当于addLast
      *
      */
     boolean add(E e);
 
     /**
-     * <p>This method is equivalent to {@link #offerLast}.
+     * 相当于offerLast
      */
     boolean offer(E e);
 
     /**
-     * <p>This method is equivalent to {@link #removeFirst()}.
-     * @throws NoSuchElementException if this deque is empty
+     * 相当于removeFirst
      */
     E remove();
 
     /**
-     * <p>This method is equivalent to {@link #pollFirst()}.
-     * @return the first element of this deque, or {@code null} if
-     *         this deque is empty
+     * 相当于pollFirst
      */
     E poll();
 
     /**
-     * <p>This method is equivalent to {@link #getFirst()}.
-     * @throws NoSuchElementException if this deque is empty
+     * 相当于getFirst
      */
     E element();
 
     /**
-     * <p>This method is equivalent to {@link #peekFirst()}.
-     * @return the head of the queue represented by this deque, or
-     *         {@code null} if this deque is empty
+     * 相当于peekFirst
      */
     E peek();
 
 
-    // *** Stack methods ***
+    // *** 栈的实现  ***
 
     /**
-     * <p>This method is equivalent to {@link #addFirst}.
-     * @throws IllegalStateException if the element cannot be added at this
+     * 相当于addFirst
      */
     void push(E e);
 
     /**
+     * 这个方法相当于removeFirst
      * this method is equivalent to {@link #removeFirst} 
      */
     E pop();
 
 
-    // *** Collection methods ***
+    //下面都是继承Collection的方法
 
     /**
      */

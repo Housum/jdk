@@ -1,5 +1,15 @@
 ### Queue 接口
 
+HEAD-E-E-E-E-E-E-E-TAIL <br/>
+添加元素从tail 添加 取出元素从 head取出<br/>
+##### 定义
+1. 这是一个队列的数据结构,重新的定义了一些方法：比如add操作可能会因为没有空间而抛出异常
+比如：remove操作会因为没有元素而抛出异常
+2. Queue主要有两组操作：一组是悲观的（不满足抛出异常）一组是乐观的（不满足只是返回false)
+3. 添加元素: add = 悲观  offer = 乐观
+4. 删除元素: remove = 悲观 poll = 乐观
+5. 查看元素: element = 悲观 peek = 乐观
+
 ```
  *  是一个队列，遵守FIFO（先进先出）
  * @see java.util.Collection
