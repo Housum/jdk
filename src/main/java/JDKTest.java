@@ -14,7 +14,7 @@ public class JDKTest {
 
 	public static void main(String[] args) {
 //		testMap();
-		testCollections();
+//		testCollections();
 	}
 
 	public static void testCollections(){
