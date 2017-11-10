@@ -60,7 +60,7 @@
  * operations will ever occur.
  *
  * 9.如果有非常多的元素需要储存到HashMap中的话，那么建议创建的时候就指定一个比较大的
- * init capacity ，这样可以避免多次的重新hash分配位置
+ * init capacity ，这样可以避免多次的重新hash分配
  * 10.如果很多的元素都hash冲突,那么肯定会导致性能的降低，为了减轻这种影响，在这种情况下
  * 如果key实现了Comparable接口的话,那么就会等到大大的缓解
  * <p>If many mappings are to be stored in a <tt>HashMap</tt>
@@ -71,7 +71,10 @@
  * down performance of any hash table. To ameliorate（减轻） impact, when keys
  * are {@link Comparable}, this class may use comparison order among
  * keys to help break ties.
- *
+ * 
+ * 11.注意HashMao不是一个线程安全的的类,如果在多线程的情况，有一个线程改变了map的结构
+ * 那么必须对这个操作进行加锁（比如增加一个元素或者删除一个元素,如果是替换一个元素那么就不是
+ * 结构改变）,最典型的用法就是使用一个对map进行封装的对象。
  * <p><strong>Note that this implementation is not synchronized.</strong>
  * If multiple threads access a hash map concurrently, and at least one of
  * the threads modifies the map structurally, it <i>must</i> be
@@ -79,29 +82,37 @@
  * that adds or deletes one or more mappings; merely changing the value
  * associated with a key that an instance already contains is not a
  * structural modification.)  This is typically accomplished by
- * synchronizing on some object that naturally encapsulates the map.
+ * synchronizing on some object that naturally encapsulates(封装) the map.
  *
+ * 12.如果没有上面提到的对象不存在的话,那么应该使用Collections#synchronizedMap
+ * 进行修饰，最好的是在创建的时候就使用，比如：Map m = Collections.synchronizedMap(new HashMap(...))
  * If no such object exists, the map should be "wrapped" using the
  * {@link Collections#synchronizedMap Collections.synchronizedMap}
- * method.  This is best done at creation time, to prevent accidental
+ * method.  This is best done at creation time, to prevent accidental(意外)
  * unsynchronized access to the map:<pre>
  *   Map m = Collections.synchronizedMap(new HashMap(...));</pre>
  *
+ * 13.被map返回的collection都是快速失败的,除了iterator自己导致的结构化改变之外,其他的
+ * 结构化改变都将抛出ConcurrentModificationException异常，因此在并发的情况下也是能够
+ * 快速的失败而不会导致米莫名其妙的错误
  * <p>The iterators returned by all of this class's "collection view methods"
  * are <i>fail-fast</i>: if the map is structurally modified at any time after
  * the iterator is created, in any way except through the iterator's own
  * <tt>remove</tt> method, the iterator will throw a
  * {@link ConcurrentModificationException}.  Thus, in the face of concurrent
  * modification, the iterator fails quickly and cleanly, rather than risking
- * arbitrary, non-deterministic behavior at an undetermined time in the
+ * arbitrary（武断）, non-deterministic behavior at an undetermined time in the
  * future.
  *
+ * 14.虽然iterator支持快速失败,但是不能保证在非线程安全的情况也能够支持的很好,在好的情况下
+ * iterator将会抛出ConcurrentModificationException异常,所以不应该编写一个依赖这个特性的
+ * 的程序,这个特性只适合用来发现一些程序中的bug(因为程序员编写的问题导致的)
  * <p>Note that the fail-fast behavior of an iterator cannot be guaranteed
  * as it is, generally speaking, impossible to make any hard guarantees in the
  * presence of unsynchronized concurrent modification.  Fail-fast iterators
  * throw <tt>ConcurrentModificationException</tt> on a best-effort basis.
  * Therefore, it would be wrong to write a program that depended on this
- * exception for its correctness: <i>the fail-fast behavior of iterators
+ * exception for its correctness(正确性): <i>the fail-fast behavior of iterators
  * should be used only to detect bugs.</i>
  *
  * <p>This class is a member of the
@@ -129,7 +140,12 @@ public class HashMap<K,V> extends AbstractMap<K,V>
 
     /*
      * Implementation notes.
-     *
+     * 1.HashMap的大部分的时间都是表现为散列桶来储存元素,但是当单个桶储存的元素太多的时候
+     * 那么就开始转化为树形结构储存元素（行为就和TreeMap相似了,大部分的时候都是
+     * 使用的一般类型的容器(散列桶), 但是在一些时候还是使用树形结构(一般都是
+     * 检查插入的node是否为TreeNode,TreeNode在使用上和其他的Node是一样的(实际上TreeNode是继承了
+     * node),但是当单个桶中元素过多的时候,检索会比较快。但是另一方面讲每次都检查类型
+     * 将会增加程序的执行时间
      * This map usually acts as a binned (bucketed) hash table, but
      * when bins get too large, they are transformed into bins of
      * TreeNodes, each structured similarly to those in
@@ -137,17 +153,21 @@ public class HashMap<K,V> extends AbstractMap<K,V>
      * relay to TreeNode methods when applicable (simply by checking
      * instanceof a node).  Bins of TreeNodes may be traversed and
      * used like any others, but additionally support faster lookup
-     * when overpopulated. However, since the vast majority of bins in
+     * when overpopulated（过多）. However, since the vast(巨大) majority（多数） of bins in
      * normal use are not overpopulated, checking for existence of
      * tree bins may be delayed in the course of table methods.
      *
+     * 2.树形的容器(储存hash值相同的桶)储存元素是按照hashCode进行排序的,
+     * 但是如果两个元素是相同的类型并且都实现了Comparable接口，那么将会采用
+     * compareTo方法进行排序（使用过反射进行判断）,增加这个复杂性是值得的,
+     * 因为当很多的元素都在hash冲突的情况下,
      * Tree bins (i.e., bins whose elements are all TreeNodes) are
      * ordered primarily by hashCode, but in the case of ties, if two
      * elements are of the same "class C implements Comparable<C>",
      * type then their compareTo method is used for ordering. (We
      * conservatively check generic types via reflection to validate
      * this -- see method comparableClassFor).  The added complexity
-     * of tree bins is worthwhile in providing worst-case O(log n)
+     * of tree bins is worthwhile(值得) in providing worst-case O(log n)
      * operations when keys either have distinct hashes or are
      * orderable, Thus, performance degrades gracefully under
      * accidental or malicious usages in which hashCode() methods
@@ -159,8 +179,9 @@ public class HashMap<K,V> extends AbstractMap<K,V>
      * programming practices that are already so slow that this makes
      * little difference.)
      *
+     * 因为TreeNodes的大小是一般的Node的两倍,所以
      * Because TreeNodes are about twice the size of regular nodes, we
-     * use them only when bins contain enough nodes to warrant use
+     * use them only when bins contain enough nodes to warrant（证明） use
      * (see TREEIFY_THRESHOLD). And when they become too small (due to
      * removal or resizing) they are converted back to plain bins.  In
      * usages with well-distributed user hashCodes, tree bins are
@@ -275,6 +296,7 @@ public class HashMap<K,V> extends AbstractMap<K,V>
     /**
      * Basic hash bin node, used for most entries.  (See below for
      * TreeNode subclass, and in LinkedHashMap for its Entry subclass.)
+     * 基本的实现类,TreeNode 是继承该类
      */
     static class Node<K,V> implements Map.Entry<K,V> {
         final int hash;
@@ -423,8 +445,9 @@ public class HashMap<K,V> extends AbstractMap<K,V>
 
     /**
      * The next size value at which to resize (capacity * load factor).
-     * 下一次扩展map之后的容量(capacity*load factor)，如果还是默认的
-     * DEFAULT_INITIAL_CAPACITY话,那么threshold为0
+     * 如果tab储存的容量大于capacity * load factor那么将扩展空间（一般都是<<1 ）
+     * 为什么这么设计呢? 前面也解释过,这样做是因为能够留足够的空间给插入的元素,防止大量的hash冲突
+     * 使hash表退化为树。
      * @serial
      */
     // (The javadoc description is true upon serialization.
@@ -438,7 +461,7 @@ public class HashMap<K,V> extends AbstractMap<K,V>
      * The load factor for the hash table.
      * map 的loadFactor
      * @serial
-     * loadFactor为
+     * loadFactor为容量的和桶数量的比,（桶数量大于容量,这样能够较少hash的冲突）
      */
     final float loadFactor;
 
@@ -627,9 +650,12 @@ public class HashMap<K,V> extends AbstractMap<K,V>
      * @param hash hash for key
      * @param key the key
      * @param value the value to put
-     * @param onlyIfAbsent if true, don't change existing value
-     * @param evict if false, the table is in creation mode.
+     * @param onlyIfAbsent if true, don't change existing value 如果传入的是true的话.
+     * 那么在元素存在的情况下,不修改元素
+     * @param evict if false, the table is in creation mode.  如为false,那么table正在
+     * 创建
      * @return previous value, or null if none
+     * 将根据hash值将元素key和value放到合适的位置
      */
     final V putVal(int hash, K key, V value, boolean onlyIfAbsent,
                    boolean evict) {
@@ -637,28 +663,43 @@ public class HashMap<K,V> extends AbstractMap<K,V>
         if ((tab = table) == null || (n = tab.length) == 0)
             n = (tab = resize()).length;
         if ((p = tab[i = (n - 1) & hash]) == null)
+            //如果原来的hash位置上不存在元素（hash没有冲突）,那么就存入一般的元素(Node)
             tab[i] = newNode(hash, key, value, null);
         else {
-            Node<K,V> e; K k;
+        //如果已经发生了hash冲突话,那么有两种方式处理方式：
+        //1. 按照链表储存;2.按照树的数据结构储存
+            Node<K,V> e; K k;  // e = exist,如果最后判断e不为null,那么说明map中不存在此map中 反之亦然
+            //如果储存的那个元素就是传入的元素（key）
             if (p.hash == hash &&
                 ((k = p.key) == key || (key != null && key.equals(k))))
                 e = p;
+             //如果拿出来的是一个数节点,那么就可以断定： 之前的已经是树形的数据储存结构了,
+             //那么就将元素插入到数中
             else if (p instanceof TreeNode)
                 e = ((TreeNode<K,V>)p).putTreeVal(this, tab, hash, key, value);
             else {
                 for (int binCount = 0; ; ++binCount) {
+                    //根据链式的查找后面的元素(TreeNode 是继承Node),直到next为null，那么
+                    //就可以知道当前的元素是最后了，并且也说明了key对应的记录并不存在
+                    //次map中
                     if ((e = p.next) == null) {
                         p.next = newNode(hash, key, value, null);
+                        //判断hash冲突的元素是否大于等于TREEIFY_THRESHOLD（8），如果大于
+                        //等于这个临界值,那么就将这些只
                         if (binCount >= TREEIFY_THRESHOLD - 1) // -1 for 1st
                             treeifyBin(tab, hash);
                         break;
                     }
+                    
+                    //如果在链式中查询到元素了,那么就知道该key对应的元素存在
                     if (e.hash == hash &&
                         ((k = e.key) == key || (key != null && key.equals(k))))
                         break;
                     p = e;
                 }
             }
+            
+            //存在久值
             if (e != null) { // existing mapping for key
                 V oldValue = e.value;
                 if (!onlyIfAbsent || oldValue == null)
@@ -667,7 +708,9 @@ public class HashMap<K,V> extends AbstractMap<K,V>
                 return oldValue;
             }
         }
+        
         ++modCount;
+        // 如果已经大于了threshold,那么进行扩容，默认大于等于75% 那么就重新的扩大到原来的两倍
         if (++size > threshold)
             resize();
         afterNodeInsertion(evict);
@@ -693,20 +736,27 @@ public class HashMap<K,V> extends AbstractMap<K,V>
         //如果之前的容量是大于0 并且没有大于定义的MAXIMUM_CAPACITY
         //的话,那么将容量进行扩容到原来的两倍
         if (oldCap > 0) {
+           //如果容量已经大于了MAXIMUM_CAPACITY,那么tab的大小将不会再扩展了(如果已经满了的话
+           //那么100%出现hash冲突)
             if (oldCap >= MAXIMUM_CAPACITY) {
                 threshold = Integer.MAX_VALUE;
                 return oldTab;
             }
+            //1.如果没有超过限制,那么将容量扩大为原来的两倍
+            //2.如果扩大之后的容量小于最大容量,并且不是初始化大小,那么同时将threshold扩大2倍
             else if ((newCap = oldCap << 1) < MAXIMUM_CAPACITY &&
                      oldCap >= DEFAULT_INITIAL_CAPACITY)
                 newThr = oldThr << 1; // double threshold
         }
+        //如果是初始化的状态(初始化的时候（如果传入的是两个参数）并没有分配tab的容量,只是分配了threshold的大小
         else if (oldThr > 0) // initial capacity was placed in threshold
             newCap = oldThr;
         else {               // zero initial threshold signifies using defaults
+            //如果是初始化的状态（初始化的时候没有传入任何的参数）那么什么都没有初始化,所以设置默认的值
             newCap = DEFAULT_INITIAL_CAPACITY;
             newThr = (int)(DEFAULT_LOAD_FACTOR * DEFAULT_INITIAL_CAPACITY);
         }
+        //如果走的路径是else if (oldThr > 0) ,那么久需要设置threshold(因为此时threshold和capacity相同了)
         if (newThr == 0) {
             float ft = (float)newCap * loadFactor;
             newThr = (newCap < MAXIMUM_CAPACITY && ft < (float)MAXIMUM_CAPACITY ?
@@ -716,9 +766,12 @@ public class HashMap<K,V> extends AbstractMap<K,V>
         @SuppressWarnings({"rawtypes","unchecked"})
             Node<K,V>[] newTab = (Node<K,V>[])new Node[newCap];
         table = newTab;
+        
+        //如果原来储存了元素,那么将这部分的元素移到新的tab中（rehash）
         if (oldTab != null) {
             for (int j = 0; j < oldCap; ++j) {
                 Node<K,V> e;
+                //这里也是分为三种情况： 1.只有一个元素 2.hash冲突但是是一个链表结构 3.hash冲突变为了树结构了
                 if ((e = oldTab[j]) != null) {
                     oldTab[j] = null;
                     if (e.next == null)

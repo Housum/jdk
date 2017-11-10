@@ -1,3 +1,4 @@
+import java.lang.reflect.TypeVariable;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -15,6 +16,8 @@ public class JDKTest {
 	public static void main(String[] args) {
 //		testMap();
 //		testCollections();
+
+        testType();
 	}
 
 	public static void testCollections(){
@@ -94,6 +97,24 @@ public class JDKTest {
 			System.out.println(itr1.next());
 		}
 	}
+
+	public static void testType(){
+
+	    Class clazz = Integer.class;
+        TypeVariable[] typeVariables = clazz.getTypeParameters();
+        for (TypeVariable p: typeVariables){
+            System.out.println(p);
+        }
+
+        List<String> list = new ArrayList<>();
+        TypeVariable[] typeVariable = list.getClass().getTypeParameters();
+
+		for (TypeVariable p: typeVariable){
+			System.out.println(p);
+		}
+
+
+    }
 
 	static class HashCode {
 		static Random random = new Random();
