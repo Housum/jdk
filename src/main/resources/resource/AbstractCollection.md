@@ -16,7 +16,9 @@
 
 public abstract class AbstractCollection<E> implements Collection<E> {
     /**
-     * 注意这里的构造函数
+     * 注意这里的构造函数，这里的设计在于序列化序列化规定： 父类必须提供无参的构造器,
+     * 但是又不能提供一个公开的构造函数（因为有些子类必须要有一些参数来保证
+     * 内部的状态正确）这个时候就可以使用一个被保护
      */
     protected AbstractCollection() {
     }

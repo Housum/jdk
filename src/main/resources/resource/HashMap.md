@@ -447,8 +447,8 @@ public class HashMap<K,V> extends AbstractMap<K,V>
      * The next size value at which to resize (capacity * load factor).
      * 如果tab储存的容量大于capacity * load factor那么将扩展空间（一般都是<<1 ）
      * 为什么这么设计呢? 前面也解释过,这样做是因为能够留足够的空间给插入的元素,防止大量的hash冲突
-     * 使hash表退化为树。
-     * @serial
+     * 使hash表退化为树. 而threshold = capacity * load factor
+     * @serial  threshold将会采用默认的序列化方式序列化
      */
     // (The javadoc description is true upon serialization.
     // Additionally, if the table array has not been allocated, this
@@ -460,8 +460,9 @@ public class HashMap<K,V> extends AbstractMap<K,V>
     /**
      * The load factor for the hash table.
      * map 的loadFactor
-     * @serial
      * loadFactor为容量的和桶数量的比,（桶数量大于容量,这样能够较少hash的冲突）
+     * 
+     * @serial 将会采用默认的方式序列化
      */
     final float loadFactor;
 
@@ -1401,6 +1402,8 @@ public class HashMap<K,V> extends AbstractMap<K,V>
     }
 
     /**
+     * 将HashMap进行序列化（采用java默认的序列化方式），格式是自定义的,
+     * 在反序列的时候必须按照序列化的格式构造数据
      * Save the state of the <tt>HashMap</tt> instance to a stream (i.e.,
      * serialize it).
      *
@@ -1422,6 +1425,7 @@ public class HashMap<K,V> extends AbstractMap<K,V>
     }
 
     /**
+     * 通过反序化构造HashMap，按照被序列化的形式反序列化
      * Reconstitute the {@code HashMap} instance from a stream (i.e.,
      * deserialize it).
      */
@@ -1430,9 +1434,12 @@ public class HashMap<K,V> extends AbstractMap<K,V>
         // Read in the threshold (ignored), loadfactor, and any hidden stuff
         s.defaultReadObject();
         reinitialize();
+        
+        //loadFactor和 threshold都是采用默认的序列化方式序列化的 ，在 s.defaultReadObject() 的时候已经初始化了
         if (loadFactor <= 0 || Float.isNaN(loadFactor))
             throw new InvalidObjectException("Illegal load factor: " +
                                              loadFactor);
+        //读出size key - value的容量
         s.readInt();                // Read and ignore number of buckets
         int mappings = s.readInt(); // Read number of mappings (size)
         if (mappings < 0)
@@ -1440,7 +1447,7 @@ public class HashMap<K,V> extends AbstractMap<K,V>
                                              mappings);
         else if (mappings > 0) { // (if zero, use defaults)
             // Size the table using given load factor only if within
-            // range of 0.25...4.0
+            // range of 0.25...4.0 
             float lf = Math.min(Math.max(0.25f, loadFactor), 4.0f);
             float fc = (float)mappings / lf + 1.0f;
             int cap = ((fc < DEFAULT_INITIAL_CAPACITY) ?
@@ -1449,6 +1456,7 @@ public class HashMap<K,V> extends AbstractMap<K,V>
                        MAXIMUM_CAPACITY :
                        tableSizeFor((int)fc));
             float ft = (float)cap * lf;
+            //重新计数threshold
             threshold = ((cap < MAXIMUM_CAPACITY && ft < MAXIMUM_CAPACITY) ?
                          (int)ft : Integer.MAX_VALUE);
             @SuppressWarnings({"rawtypes","unchecked"})
