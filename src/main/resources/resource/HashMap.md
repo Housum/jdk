@@ -1447,7 +1447,7 @@ public class HashMap<K,V> extends AbstractMap<K,V>
                                              mappings);
         else if (mappings > 0) { // (if zero, use defaults)
             // Size the table using given load factor only if within
-            // range of 0.25...4.0 
+            // range of 0.25...4.0  保证loadFactor在0.25 到4.0之间
             float lf = Math.min(Math.max(0.25f, loadFactor), 4.0f);
             float fc = (float)mappings / lf + 1.0f;
             int cap = ((fc < DEFAULT_INITIAL_CAPACITY) ?
