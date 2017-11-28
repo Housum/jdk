@@ -1,11 +1,5 @@
 import java.lang.reflect.TypeVariable;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Objects;
-import java.util.Random;
+import java.util.*;
 
 /**
  * @author luqibao
@@ -14,13 +8,32 @@ import java.util.Random;
 public class JDKTest {
 
 	public static void main(String[] args) {
-//		testMap();
-//		testCollections();
-
-        testType();
+		// testMap();
+		// testCollections();
+		// testType();
+		testTreeMap();
 	}
 
-	public static void testCollections(){
+	public static void testTreeMap() {
+
+		TreeMap<String, String> treeMap = new TreeMap<>();
+		treeMap.put("1", "111");
+		treeMap.put("2", "222");
+		treeMap.put("3", "333");
+		treeMap.put("4", "444");
+		String floorKey = treeMap.floorKey("2");
+		String lowerKey = treeMap.lowerKey("2");
+		String ceilingKey = treeMap.ceilingKey("2");
+		String higherKey = treeMap.higherKey("2");
+		SortedMap<String, String> subMap = treeMap.subMap("1", "3"); // <include,exclude>
+		log(floorKey + "|" + ceilingKey + "|" +lowerKey + "|" + higherKey);
+		log(subMap);
+
+
+
+	}
+
+	public static void testCollections() {
 
 		List<String> list = new ArrayList<>();
 		list.add("1");
@@ -28,45 +41,45 @@ public class JDKTest {
 		list.add("3");
 		list.add("4");
 		Collections.reverse(list);
-        log(list);
+		log(list);
 
 		Collections.shuffle(list);
-        log(list);
-
-		Collections.sort(list);
-		rotate2(list,1);
-		log(list);
-
-        Collections.sort(list);
-		Collections.rotate(list,1);
 		log(list);
 
 		Collections.sort(list);
-        log(list);
+		rotate2(list, 1);
+		log(list);
 
-        Collections.sort(list);
+		Collections.sort(list);
+		Collections.rotate(list, 1);
+		log(list);
 
-        List<String> subList = new ArrayList<>(2);
+		Collections.sort(list);
+		log(list);
 
-        subList.add("3");
-        subList.add("4");
+		Collections.sort(list);
 
-        log(Collections.indexOfSubList(list,subList));
+		List<String> subList = new ArrayList<>(2);
 
+		subList.add("3");
+		subList.add("4");
 
-        log(Collections.lastIndexOfSubList(list,subList));
+		log(Collections.indexOfSubList(list, subList));
 
+		log(Collections.lastIndexOfSubList(list, subList));
 
 	}
-	public static void log(Object msg){
+
+	public static void log(Object msg) {
 		System.out.println("=================================");
 		System.out.println(Objects.toString(msg));
 	}
+
 	private static void rotate2(List<?> list, int distance) {
 		int size = list.size();
 		if (size == 0)
 			return;
-		int mid =  -distance % size;
+		int mid = -distance % size;
 		if (mid < 0)
 			mid += size;
 		if (mid == 0)
@@ -77,7 +90,7 @@ public class JDKTest {
 		Collections.reverse(list);
 	}
 
-	public static void testMap(){
+	public static void testMap() {
 		HashMap<HashCode, String> map = new HashMap<>(100);
 
 		HashCode hashCode = null;
@@ -98,23 +111,22 @@ public class JDKTest {
 		}
 	}
 
-	public static void testType(){
+	public static void testType() {
 
-	    Class clazz = Integer.class;
-        TypeVariable[] typeVariables = clazz.getTypeParameters();
-        for (TypeVariable p: typeVariables){
-            System.out.println(p);
-        }
-
-        List<String> list = new ArrayList<>();
-        TypeVariable[] typeVariable = list.getClass().getTypeParameters();
-
-		for (TypeVariable p: typeVariable){
+		Class clazz = Integer.class;
+		TypeVariable[] typeVariables = clazz.getTypeParameters();
+		for (TypeVariable p : typeVariables) {
 			System.out.println(p);
 		}
 
+		List<String> list = new ArrayList<>();
+		TypeVariable[] typeVariable = list.getClass().getTypeParameters();
 
-    }
+		for (TypeVariable p : typeVariable) {
+			System.out.println(p);
+		}
+
+	}
 
 	static class HashCode {
 		static Random random = new Random();
