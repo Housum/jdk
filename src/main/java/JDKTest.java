@@ -12,6 +12,8 @@ public class JDKTest {
 		// testCollections();
 		// testType();
 		testTreeMap();
+
+
 	}
 
 	public static void testTreeMap() {
@@ -22,17 +24,18 @@ public class JDKTest {
 		treeMap.put("3", "333");
 		treeMap.put("4", "444");
 		String floorKey = treeMap.floorKey("2");
-		String lowerKey = treeMap.lowerKey("2");
 		String ceilingKey = treeMap.ceilingKey("2");
+
+		String lowerKey = treeMap.lowerKey("2");
 		String higherKey = treeMap.higherKey("2");
 		SortedMap<String, String> subMap = treeMap.subMap("1", "3"); // <include,exclude>
-		log(floorKey + "|" + ceilingKey + "|" +lowerKey + "|" + higherKey);
+		log(floorKey + "|" + ceilingKey + "|" + lowerKey + "|" + higherKey);
 		log(subMap);
 
-
+		SortedMap<String,String> subTreeMap = treeMap.headMap("3",true);
+		log(subTreeMap);
 
 	}
-
 	public static void testCollections() {
 
 		List<String> list = new ArrayList<>();

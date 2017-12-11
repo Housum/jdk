@@ -16,184 +16,83 @@ Navigable 接口,这个接口主要设计为定位元素的,扩展自SortMap
  * 3.增加的方法@code firstEntry}, {@code pollFirstEntry}, {@code lastEntry},  {@code pollLastEntry} 
  * 可以返回或者删除最大或者最小的值，如果不存在的话,那么返回null
  * 
- * 4.对于所有返回的元素都介意实现于Map.Entry并且不要实现setValue方法，但是可以通过
+ * 4.对于所有返回的元素都建议实现于Map.Entry并且不要实现setValue方法，但是可以通过
  * put方法修改关联的值
- *
- * <p>Methods
- * {@link #subMap(Object, Object) subMap(K, K)},
- * {@link #headMap(Object) headMap(K)}, and
- * {@link #tailMap(Object) tailMap(K)}
- * are specified to return {@code SortedMap} to allow existing
- * implementations of {@code SortedMap} to be compatibly retrofitted to
- * implement {@code NavigableMap}, but extensions and implementations
- * of this interface are encouraged to override these methods to return
- * {@code NavigableMap}.  Similarly,
- * {@link #keySet()} can be overriden to return {@code NavigableSet}.
- *
- * <p>This interface is a member of the
- * <a href="{@docRoot}/../technotes/guides/collections/index.html">
- * Java Collections Framework</a>.
- *
- * @author Doug Lea
- * @author Josh Bloch
+ * 
+ * 5. 对于subMap,headMap,tailMap (从SortMap继承而来的)的方法可以适当的进行翻新
+ * 使其返回的值继承自NavigableMap，其他的情况keySet()也可以返回NavigableSet
  * @param <K> the type of keys maintained by this map
  * @param <V> the type of mapped values
- * @since 1.6
  */
 public interface NavigableMap<K,V> extends SortedMap<K,V> {
     /**
-     * Returns a key-value mapping associated with the greatest key
-     * strictly less than the given key, or {@code null} if there is
-     * no such key.
-     *
-     * @param key the key
-     * @return an entry with the greatest key less than {@code key},
-     *         or {@code null} if there is no such key
-     * @throws ClassCastException if the specified key cannot be compared
-     *         with the keys currently in the map
-     * @throws NullPointerException if the specified key is null
-     *         and this map does not permit null keys
+     * 返回Map中小于Key的并且最接近的Key的值，如果不存在的话 那么返回null
      */
     Map.Entry<K,V> lowerEntry(K key);
 
     /**
-     * Returns the greatest key strictly less than the given key, or
-     * {@code null} if there is no such key.
-     *
-     * @param key the key
-     * @return the greatest key less than {@code key},
-     *         or {@code null} if there is no such key
-     * @throws ClassCastException if the specified key cannot be compared
-     *         with the keys currently in the map
-     * @throws NullPointerException if the specified key is null
-     *         and this map does not permit null keys
+     * 和lowerEntry(K key)类似 但是返回的不是map的值而是map的key
      */
     K lowerKey(K key);
 
     /**
-     * Returns a key-value mapping associated with the greatest key
-     * less than or equal to the given key, or {@code null} if there
-     * is no such key.
-     *
-     * @param key the key
-     * @return an entry with the greatest key less than or equal to
-     *         {@code key}, or {@code null} if there is no such key
-     * @throws ClassCastException if the specified key cannot be compared
-     *         with the keys currently in the map
-     * @throws NullPointerException if the specified key is null
-     *         and this map does not permit null keys
+     * 返回Map中低于或者等于key的值，如果不存在的话 返回null
      */
     Map.Entry<K,V> floorEntry(K key);
 
     /**
-     * Returns the greatest key less than or equal to the given key,
-     * or {@code null} if there is no such key.
-     *
-     * @param key the key
-     * @return the greatest key less than or equal to {@code key},
-     *         or {@code null} if there is no such key
-     * @throws ClassCastException if the specified key cannot be compared
-     *         with the keys currently in the map
-     * @throws NullPointerException if the specified key is null
-     *         and this map does not permit null keys
+     * 和floorEntry(K key)类似 但是返回的是不是值,而不是key，如果不存在
+     * 也是返回null
      */
     K floorKey(K key);
 
     /**
-     * Returns a key-value mapping associated with the least key
-     * greater than or equal to the given key, or {@code null} if
-     * there is no such key.
-     *
-     * @param key the key
-     * @return an entry with the least key greater than or equal to
-     *         {@code key}, or {@code null} if there is no such key
-     * @throws ClassCastException if the specified key cannot be compared
-     *         with the keys currently in the map
-     * @throws NullPointerException if the specified key is null
-     *         and this map does not permit null keys
+     * 和floorEntry刚好相反,返回的是大于或者等于给定key的值，如果不存在的话,那么返回
+     * null
      */
     Map.Entry<K,V> ceilingEntry(K key);
 
     /**
-     * Returns the least key greater than or equal to the given key,
-     * or {@code null} if there is no such key.
-     *
-     * @param key the key
-     * @return the least key greater than or equal to {@code key},
-     *         or {@code null} if there is no such key
-     * @throws ClassCastException if the specified key cannot be compared
-     *         with the keys currently in the map
-     * @throws NullPointerException if the specified key is null
-     *         and this map does not permit null keys
+     * 和ceilingEntry(K key) 类似，但是返回的Key而不是单个的元素
      */
     K ceilingKey(K key);
 
     /**
-     * Returns a key-value mapping associated with the least key
-     * strictly greater than the given key, or {@code null} if there
-     * is no such key.
-     *
-     * @param key the key
-     * @return an entry with the least key greater than {@code key},
-     *         or {@code null} if there is no such key
-     * @throws ClassCastException if the specified key cannot be compared
-     *         with the keys currently in the map
-     * @throws NullPointerException if the specified key is null
-     *         and this map does not permit null keys
+     * 返回大于给定key的值，如果不存在的话,那么返回null
      */
     Map.Entry<K,V> higherEntry(K key);
 
     /**
-     * Returns the least key strictly greater than the given key, or
-     * {@code null} if there is no such key.
-     *
-     * @param key the key
-     * @return the least key greater than {@code key},
-     *         or {@code null} if there is no such key
-     * @throws ClassCastException if the specified key cannot be compared
-     *         with the keys currently in the map
-     * @throws NullPointerException if the specified key is null
-     *         and this map does not permit null keys
+     * 和higherEntry(K key)类似,但是返回的是key，如果不存在那么返回null
      */
     K higherKey(K key);
 
     /**
-     * Returns a key-value mapping associated with the least
-     * key in this map, or {@code null} if the map is empty.
-     *
-     * @return an entry with the least key,
-     *         or {@code null} if this map is empty
+     * 返回Map中key最小的那个值(利用SortedMap的比较方式比较出来的),如果Map
+     * 是空的话,那么返回null
      */
     Map.Entry<K,V> firstEntry();
 
     /**
-     * Returns a key-value mapping associated with the greatest
-     * key in this map, or {@code null} if the map is empty.
-     *
-     * @return an entry with the greatest key,
-     *         or {@code null} if this map is empty
+     * 返回Map中key最大的哪个值(利用SortedMap的比较方式比较出来的)
+     * 是空的话,那么返回null
      */
     Map.Entry<K,V> lastEntry();
 
     /**
-     * Removes and returns a key-value mapping associated with
-     * the least key in this map, or {@code null} if the map is empty.
-     *
-     * @return the removed first entry of this map,
-     *         or {@code null} if this map is empty
+     * 和firstEntry的区别是会将元素弹出，
      */
     Map.Entry<K,V> pollFirstEntry();
 
     /**
-     * Removes and returns a key-value mapping associated with
-     * the greatest key in this map, or {@code null} if the map is empty.
-     *
-     * @return the removed last entry of this map,
-     *         or {@code null} if this map is empty
+     *和lastEntry的区别是会将元素弹出
      */
     Map.Entry<K,V> pollLastEntry();
 
     /**
+     * 返回的Map是本Map的反转,返回的map是一个视图,所以在两边的任何修改操作都是相互影响的
+     * 如果在迭代的过程中map删除了元素（除非是iterator自己删除的）这种情况下,结果是没有
+     * 定义的
      * Returns a reverse order view of the mappings contained in this map.
      * The descending map is backed by this map, so changes to the map are
      * reflected in the descending map, and vice-versa.  If either map is
@@ -211,6 +110,10 @@ public interface NavigableMap<K,V> extends SortedMap<K,V> {
     NavigableMap<K,V> descendingMap();
 
     /**
+     * 返回的map的key的集合，返回的集合是map键的一个视图,所以对于
+     * 集合中key的修改都反映到map中，反之亦然。如果在集合进行迭代操作的时候map对元素进行的修改
+     * 那么迭代的操作结果将是未知的. 同时这个集合支持删除的操作,删除会反映到map中去,同理map中的元素
+     * 删除也会反映到集合中.但是集合不支持add和addAll操作
      * Returns a {@link NavigableSet} view of the keys contained in this map.
      * The set's iterator returns the keys in ascending order.
      * The set is backed by the map, so changes to the map are reflected in
@@ -227,6 +130,7 @@ public interface NavigableMap<K,V> extends SortedMap<K,V> {
     NavigableSet<K> navigableKeySet();
 
     /**
+     * 和descendingMap()类似 返回一个倒叙的key的集合，其他的性质和navigableKeySet()描述的相同
      * Returns a reverse order {@link NavigableSet} view of the keys contained in this map.
      * The set's iterator returns the keys in descending order.
      * The set is backed by the map, so changes to the map are reflected in
@@ -243,17 +147,12 @@ public interface NavigableMap<K,V> extends SortedMap<K,V> {
     NavigableSet<K> descendingKeySet();
 
     /**
-     * Returns a view of the portion of this map whose keys range from
-     * {@code fromKey} to {@code toKey}.  If {@code fromKey} and
-     * {@code toKey} are equal, the returned map is empty unless
-     * {@code fromInclusive} and {@code toInclusive} are both true.  The
-     * returned map is backed by this map, so changes in the returned map are
-     * reflected in this map, and vice-versa.  The returned map supports all
-     * optional map operations that this map supports.
-     *
-     * <p>The returned map will throw an {@code IllegalArgumentException}
-     * on an attempt to insert a key outside of its range, or to construct a
-     * submap either of whose endpoints lie outside its range.
+     * 1. 返回一个子的map,和SortedMap中有非常大的不同点在于: 可以指定是否包含两边
+     * 的值，如果fromKey和toKey都相等的时候,那么将会返回空的map（除非两个boolean类型的
+     * 参数都为true）
+     * 2. 返回的map是主map的一个视图,所以子map和主map的修改是相互影响的，返回的子map支持
+     * 所有在主map中使用的方法
+     * 3.如果将一个key超出范围的元素插入到子map中的话,那么将抛出IllegalArgumentException异常
      *
      * @param fromKey low endpoint of the keys in the returned map
      * @param fromInclusive {@code true} if the low endpoint
@@ -280,6 +179,7 @@ public interface NavigableMap<K,V> extends SortedMap<K,V> {
                              K toKey,   boolean toInclusive);
 
     /**
+     * 和SortedMap中的headMap类型,但是多了一个布尔值设置是否包含边界
      * Returns a view of the portion of this map whose keys are less than (or
      * equal to, if {@code inclusive} is true) {@code toKey}.  The returned
      * map is backed by this map, so changes in the returned map are reflected
@@ -309,35 +209,15 @@ public interface NavigableMap<K,V> extends SortedMap<K,V> {
     NavigableMap<K,V> headMap(K toKey, boolean inclusive);
 
     /**
-     * Returns a view of the portion of this map whose keys are greater than (or
-     * equal to, if {@code inclusive} is true) {@code fromKey}.  The returned
-     * map is backed by this map, so changes in the returned map are reflected
-     * in this map, and vice-versa.  The returned map supports all optional
-     * map operations that this map supports.
-     *
-     * <p>The returned map will throw an {@code IllegalArgumentException}
-     * on an attempt to insert a key outside its range.
-     *
-     * @param fromKey low endpoint of the keys in the returned map
-     * @param inclusive {@code true} if the low endpoint
-     *        is to be included in the returned view
-     * @return a view of the portion of this map whose keys are greater than
-     *         (or equal to, if {@code inclusive} is true) {@code fromKey}
-     * @throws ClassCastException if {@code fromKey} is not compatible
-     *         with this map's comparator (or, if the map has no comparator,
-     *         if {@code fromKey} does not implement {@link Comparable}).
-     *         Implementations may, but are not required to, throw this
-     *         exception if {@code fromKey} cannot be compared to keys
-     *         currently in the map.
-     * @throws NullPointerException if {@code fromKey} is null
-     *         and this map does not permit null keys
-     * @throws IllegalArgumentException if this map itself has a
-     *         restricted range, and {@code fromKey} lies outside the
-     *         bounds of the range
+     * 返回一个子的Map，这个Map的值是从key大于fromKey或者等于fromKey开始(取决于inclusive
+     * 设置的值)，返回的Map是当前这个Map的一个视图，所以无论是哪个Map的修改对方都能看到，并且
+     * 返回的Map支持所有当前Map的操作，但是向返回的Map中插入一个不在Key不在范围内的值的话，那么
+     * 将会抛出IllegalArgumentException异常
      */
     NavigableMap<K,V> tailMap(K fromKey, boolean inclusive);
 
     /**
+     * 继承自SortedMap
      * {@inheritDoc}
      *
      * <p>Equivalent to {@code subMap(fromKey, true, toKey, false)}.
@@ -349,6 +229,7 @@ public interface NavigableMap<K,V> extends SortedMap<K,V> {
     SortedMap<K,V> subMap(K fromKey, K toKey);
 
     /**
+     * 继承自SortedMap 
      * {@inheritDoc}
      *
      * <p>Equivalent to {@code headMap(toKey, false)}.
@@ -356,10 +237,12 @@ public interface NavigableMap<K,V> extends SortedMap<K,V> {
      * @throws ClassCastException       {@inheritDoc}
      * @throws NullPointerException     {@inheritDoc}
      * @throws IllegalArgumentException {@inheritDoc}
+     *  
      */
     SortedMap<K,V> headMap(K toKey);
 
     /**
+     *继承自SortedMap 
      * {@inheritDoc}
      *
      * <p>Equivalent to {@code tailMap(fromKey, true)}.
@@ -367,6 +250,7 @@ public interface NavigableMap<K,V> extends SortedMap<K,V> {
      * @throws ClassCastException       {@inheritDoc}
      * @throws NullPointerException     {@inheritDoc}
      * @throws IllegalArgumentException {@inheritDoc}
+     * 
      */
     SortedMap<K,V> tailMap(K fromKey);
 }

@@ -8,10 +8,12 @@ public class SeriaClass extends SupperSeriaClass implements Serializable {
 
 	private int idx;
 
-
-	public SeriaClass(){
-	    System.out.println("construction 1");
-    }
+	/**
+	 * 反序列的时候必须提供一个空的构造函数
+	 */
+	public SeriaClass() {
+		System.out.println("construction 1");
+	}
 
 	public SeriaClass(int idx) {
 		super(2);
@@ -37,16 +39,17 @@ public class SeriaClass extends SupperSeriaClass implements Serializable {
 
 	}
 
-    /**
-     * 在序列化完之后执行
-     * @return
-     */
-	private Object readResolve(){
+	/**
+	 * 在序列化完之后执行
+	 * 
+	 * @return
+	 */
+	private Object readResolve() {
 
-	    System.out.println(" resolve ... ");
+		System.out.println(" resolve ... ");
 
-	    return  this;
-    }
+		return this;
+	}
 
 	@Override
 	public String toString() {
