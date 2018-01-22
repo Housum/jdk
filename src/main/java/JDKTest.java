@@ -1,3 +1,9 @@
+import java.io.InvalidClassException;
+import java.io.ObjectStreamClass;
+import java.io.ObjectStreamField;
+import java.io.Serializable;
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
 import java.lang.reflect.TypeVariable;
 import java.util.*;
 
@@ -7,13 +13,86 @@ import java.util.*;
  */
 public class JDKTest {
 
-	public static void main(String[] args) {
+	private static Garbage WEAK_HOLDER;
+	private static byte[] bytes;
+
+	public static void main(String[] args) throws Exception {
 		// testMap();
 		// testCollections();
 		// testType();
-		testTreeMap();
+		// testTreeMap();
+		// testWeakHashMap();
 
+		testObjectStreamClass();
 
+	}
+
+	public static void testObjectStreamClass() throws Exception {
+
+		ObjectStreamClass streamClass = ObjectStreamClass.lookup(Garbage.class);
+		long startTime = System.currentTimeMillis();
+		log(streamClass.getSerialVersionUID());
+		System.out.println((System.currentTimeMillis() - startTime));
+
+		Field field = ObjectStreamClassDemo.class.getDeclaredField("field");
+		field.setAccessible(true);
+		// 静态变量的获取
+		String value = (String) field.get(null);
+		log(value);
+
+		getDeclaredSerialFields(ObjectStreamClassDemo.class);
+
+	}
+
+	/**
+	 * 获取需要序列化的字段
+	 * 
+	 * @param cl
+	 * @return
+	 * @throws InvalidClassException
+	 */
+	private static ObjectStreamField[] getDeclaredSerialFields(Class<?> cl) throws InvalidClassException {
+		ObjectStreamField[] serialPersistentFields = null;
+		try {
+			Field f = cl.getDeclaredField("serialPersistentFields");
+			int mask = Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL;
+			if ((f.getModifiers() & mask) == mask) {
+				f.setAccessible(true);
+				serialPersistentFields = (ObjectStreamField[]) f.get(null);
+			}
+		} catch (Exception ex) {
+		}
+		if (serialPersistentFields == null) {
+			return null;
+		} else if (serialPersistentFields.length == 0) {
+			return new ObjectStreamField[] {};
+		}
+
+		return null;
+	}
+
+	public static void testWeakHashMap() throws Exception {
+
+		Map<Garbage, String> weakHashMap = new WeakHashMap<>();
+		Garbage garbage1 = new Garbage("use");
+
+		weakHashMap.put(garbage1, "use");
+
+		log(weakHashMap);
+
+		WEAK_HOLDER = garbage1;
+		bytes = new byte[1024 * 1024 * 1024];
+
+		Garbage garbage2 = null;
+		for (int i = 1;; i++) {
+			garbage2 = new Garbage("unUse" + i);
+			weakHashMap.put(garbage2, "unUse" + i);
+			if (hasGarbage) {
+				break;
+			}
+		}
+
+		log(weakHashMap.get(WEAK_HOLDER) + "!!!!!!!!!!!!!!!!!!");
 	}
 
 	public static void testTreeMap() {
@@ -32,10 +111,16 @@ public class JDKTest {
 		log(floorKey + "|" + ceilingKey + "|" + lowerKey + "|" + higherKey);
 		log(subMap);
 
-		SortedMap<String,String> subTreeMap = treeMap.headMap("3",true);
+		SortedMap<String, String> subTreeMap = treeMap.headMap("3", true);
 		log(subTreeMap);
+		for (Map.Entry<String, String> entry : treeMap.entrySet()) {
+			entry.setValue(entry.getValue() + ".old");
+		}
+
+		log(treeMap);
 
 	}
+
 	public static void testCollections() {
 
 		List<String> list = new ArrayList<>();
@@ -145,5 +230,38 @@ public class JDKTest {
 
 			return index + "";
 		}
+	}
+
+	private static volatile boolean hasGarbage;
+
+	private static class Garbage implements Serializable {
+		public Garbage(String desc) {
+			this.desc = desc;
+		}
+
+		String desc;
+
+		String idx;
+
+		@Override
+		protected void finalize() throws Throwable {
+			log("garbage " + desc);
+			hasGarbage = true;
+			super.finalize();
+		}
+
+		@Override
+		public String toString() {
+			return desc;
+		}
+	}
+
+	private static class ObjectStreamClassDemo implements Serializable {
+
+		private static final String field = "field";
+
+		private static final ObjectStreamField[] serialPersistentFields = new ObjectStreamField[] {
+				new ObjectStreamField("field", String.class) };
+
 	}
 }
