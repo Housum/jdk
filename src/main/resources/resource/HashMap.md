@@ -355,7 +355,8 @@ public class HashMap<K,V> extends AbstractMap<K,V>
      * cheapest possible way to reduce systematic lossage, as well as
      * to incorporate impact of the highest bits that would otherwise
      * never be used in index calculations because of table bounds.
-     * 计算key 的hashcode,并且高位和低位进行异或操作，这样做的作用是减少hash碰撞
+     * 计算key 的hashcode,并且高位和低位进行异或操作，这样做的作用是减少hash碰撞（
+     * 因为计算元素处于数组tables的位置，大部分都是后几位=e.hash & (newCap - 1),这样的话高位的就没有作用了，所以将高位和低位进行异或操作，使高位和地位都要作用）
      */
     static final int hash(Object key) {
         int h;
@@ -397,6 +398,11 @@ public class HashMap<K,V> extends AbstractMap<K,V>
 
     /**
      * Returns a power of two size for the given target capacity.
+     * 返回大于等于给定数的2的指数
+     * 15 ->16 
+     * 16 ->16
+     * 17 ->32
+     * 33 ->64
      */
     static final int tableSizeFor(int cap) {
         int n = cap - 1;
@@ -460,8 +466,7 @@ public class HashMap<K,V> extends AbstractMap<K,V>
     /**
      * The load factor for the hash table.
      * map 的loadFactor
-     * loadFactor为容量的和桶数量的比,（桶数量大于容量,这样能够较少hash的冲突）
-     * 
+     * loadFactor为容量的和桶数量的比,（桶数量大于容量,这样能够较少hash的冲突） threshold = capacity * load factor
      * @serial 将会采用默认的方式序列化
      */
     final float loadFactor;
@@ -525,14 +530,15 @@ public class HashMap<K,V> extends AbstractMap<K,V>
 
     /**
      * Implements Map.putAll and Map constructor
-     *
+     * 实现了Map的putAll 以及构造方法
      * @param m the map
      * @param evict false when initially constructing this map, else
-     * true (relayed to method afterNodeInsertion).
+     * true (relayed to method afterNodeInsertion). 当false的时候为构造map时候调用,当为true的时候,那么说明在afterNodeInsertion发起的
      */
     final void putMapEntries(Map<? extends K, ? extends V> m, boolean evict) {
         int s = m.size();
-        if (s > 0) {
+        if (s > 0) 
+            //第一次初始化
             if (table == null) { // pre-size
                 float ft = ((float)s / loadFactor) + 1.0F;
                 int t = ((ft < (float)MAXIMUM_CAPACITY) ?
@@ -592,7 +598,7 @@ public class HashMap<K,V> extends AbstractMap<K,V>
 
     /**
      * Implements Map.get and related methods
-     *
+     * 实现Map的get方法,
      * @param hash hash for key
      * @param key the key
      * @return the node, or null if none
@@ -603,11 +609,14 @@ public class HashMap<K,V> extends AbstractMap<K,V>
             (first = tab[(n - 1) & hash]) != null) {
             if (first.hash == hash && // always check first node
                 ((k = first.key) == key || (key != null && key.equals(k))))
+                //如果只存在一个的情况下，直接返回
                 return first;
             if ((e = first.next) != null) {
                 if (first instanceof TreeNode)
+                    //如果冲突太多了,已经是一颗树节点,那么从红黑树中获取元素
                     return ((TreeNode<K,V>)first).getTreeNode(hash, key);
                 do {
+                    //如果是链表,那么从链表中查询元素
                     if (e.hash == hash &&
                         ((k = e.key) == key || (key != null && key.equals(k))))
                         return e;
@@ -647,7 +656,7 @@ public class HashMap<K,V> extends AbstractMap<K,V>
 
     /**
      * Implements Map.put and related methods
-     *
+     * 将根据hash值将元素key和value放到合适的位置
      * @param hash hash for key
      * @param key the key
      * @param value the value to put
@@ -655,8 +664,7 @@ public class HashMap<K,V> extends AbstractMap<K,V>
      * 那么在元素存在的情况下,不修改元素
      * @param evict if false, the table is in creation mode.  如为false,那么table正在
      * 创建
-     * @return previous value, or null if none
-     * 将根据hash值将元素key和value放到合适的位置
+     * @return previous value, or null if none  如果不存在返回null，否则返回之前的值
      */
     final V putVal(int hash, K key, V value, boolean onlyIfAbsent,
                    boolean evict) {
@@ -664,30 +672,30 @@ public class HashMap<K,V> extends AbstractMap<K,V>
         if ((tab = table) == null || (n = tab.length) == 0)
             n = (tab = resize()).length;
         if ((p = tab[i = (n - 1) & hash]) == null)
+             //(n - 1) & hash 计算元素落的位置  @see java.util.HashMap.hash
             //如果原来的hash位置上不存在元素（hash没有冲突）,那么就存入一般的元素(Node)
             tab[i] = newNode(hash, key, value, null);
         else {
-        //如果已经发生了hash冲突话,那么有两种方式处理方式：
-        //1. 按照链表储存;2.按照树的数据结构储存
+            //如果已经发生了hash冲突话,那么有两种方式处理方式：
+            //1. 按照链表储存;2.按照树的数据结构储存
             Node<K,V> e; K k;  // e = exist,如果最后判断e不为null,那么说明map中不存在此map中 反之亦然
-            //如果储存的那个元素就是传入的元素（key）
             if (p.hash == hash &&
                 ((k = p.key) == key || (key != null && key.equals(k))))
+                //如果原先储存的那个元素的key和新存入的key相同，那么进行替换(这种情况不是hash冲突)（在后面统一处理）
                 e = p;
-             //如果拿出来的是一个数节点,那么就可以断定： 之前的已经是树形的数据储存结构了,
-             //那么就将元素插入到数中
             else if (p instanceof TreeNode)
+                 //如果拿出来的是一个树节点,那么就可以断定： 之前的已经是树形的数据储存结构了,
+                 //那么就将元素插入到数中
                 e = ((TreeNode<K,V>)p).putTreeVal(this, tab, hash, key, value);
             else {
                 for (int binCount = 0; ; ++binCount) {
-                    //根据链式的查找后面的元素(TreeNode 是继承Node),直到next为null，那么
-                    //就可以知道当前的元素是最后了，并且也说明了key对应的记录并不存在
-                    //次map中
+                    //根据链式的查找后面的元素,直到next为null，那么
+                    //就可以知道当前的元素是最后了，并且也说明了key对应的记录并不存在map中，将next指向新插入的元素
                     if ((e = p.next) == null) {
                         p.next = newNode(hash, key, value, null);
-                        //判断hash冲突的元素是否大于等于TREEIFY_THRESHOLD（8），如果大于
-                        //等于这个临界值,那么就将这些只
                         if (binCount >= TREEIFY_THRESHOLD - 1) // -1 for 1st
+                            //判断hash冲突的元素是否大于等于TREEIFY_THRESHOLD（8），如果大于
+                            //等于这个临界值,那么就将这些只
                             treeifyBin(tab, hash);
                         break;
                     }
@@ -695,12 +703,13 @@ public class HashMap<K,V> extends AbstractMap<K,V>
                     //如果在链式中查询到元素了,那么就知道该key对应的元素存在
                     if (e.hash == hash &&
                         ((k = e.key) == key || (key != null && key.equals(k))))
+                         //如果原先储存的那个元素的key和新存入的key相同，那么进行替换(这种情况不是hash冲突)（在后面统一处理）
                         break;
                     p = e;
                 }
             }
             
-            //存在久值
+            //存在旧值
             if (e != null) { // existing mapping for key
                 V oldValue = e.value;
                 if (!onlyIfAbsent || oldValue == null)
@@ -755,9 +764,10 @@ public class HashMap<K,V> extends AbstractMap<K,V>
         else {               // zero initial threshold signifies using defaults
             //如果是初始化的状态（初始化的时候没有传入任何的参数）那么什么都没有初始化,所以设置默认的值
             newCap = DEFAULT_INITIAL_CAPACITY;
+            //设置默认的threhold ,就是总容量的75%
             newThr = (int)(DEFAULT_LOAD_FACTOR * DEFAULT_INITIAL_CAPACITY);
         }
-        //如果走的路径是else if (oldThr > 0) ,那么久需要设置threshold(因为此时threshold和capacity相同了)
+        //如果走的路径是else if (oldThr > 0) ,那么就需要设置threshold(减小到capacity的75%)
         if (newThr == 0) {
             float ft = (float)newCap * loadFactor;
             newThr = (newCap < MAXIMUM_CAPACITY && ft < (float)MAXIMUM_CAPACITY ?
@@ -776,15 +786,23 @@ public class HashMap<K,V> extends AbstractMap<K,V>
                 if ((e = oldTab[j]) != null) {
                     oldTab[j] = null;
                     if (e.next == null)
+                     //原有表中是没有hash冲突的，这种最为简单只需要直接放入到新的数组中
+                     //取e.hash的后x位(因为newCap是2的n次方,减1所以会变为全部为1，比如32 -1 那么二进制为: 11111）
+                     //和之前的对比,相当于有一个2次幂的位移(老的是2^(n-1),现在是2^n 等价于: 老的二进制为n-1个1,新的二进制为n个1 )
                         newTab[e.hash & (newCap - 1)] = e;
                     else if (e instanceof TreeNode)
+                    //原有的hash冲突已经狠多了,所以导致退化成了红黑树,所以需要把树移到新的数组中去
                         ((TreeNode<K,V>)e).split(this, newTab, j, oldCap);
                     else { // preserve order
+                    //原有的hash冲突还不是很多,所以还是一个链表结构
+                    
+                        这里为什么会采用两套设计?
                         Node<K,V> loHead = null, loTail = null;
                         Node<K,V> hiHead = null, hiTail = null;
                         Node<K,V> next;
                         do {
                             next = e.next;
+                            //如果并得结果为0,那么说明前x-1位都为0，这种情况的话直接储存到原有的位置
                             if ((e.hash & oldCap) == 0) {
                                 if (loTail == null)
                                     loHead = e;
@@ -793,6 +811,7 @@ public class HashMap<K,V> extends AbstractMap<K,V>
                                 loTail = e;
                             }
                             else {
+                            //这种情况下,上前位移一位
                                 if (hiTail == null)
                                     hiHead = e;
                                 else

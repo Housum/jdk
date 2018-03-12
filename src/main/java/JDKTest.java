@@ -1,3 +1,5 @@
+import sun.misc.Unsafe;
+
 import java.io.InvalidClassException;
 import java.io.ObjectStreamClass;
 import java.io.ObjectStreamField;
@@ -15,6 +17,41 @@ public class JDKTest {
 
 	private static Garbage WEAK_HOLDER;
 	private static byte[] bytes;
+	private static final sun.misc.Unsafe U;
+
+	private volatile long size = 0;
+	private static final long SIZE;
+
+	static {
+		try {
+			U = getUnsafe();
+			Class<?> k = JDKTest.class;
+			SIZE = U.objectFieldOffset(k.getDeclaredField("size"));
+		} catch (Exception e) {
+			throw new Error(e);
+		}
+	}
+
+	public static Unsafe getUnsafe() {
+		try {
+			Field f = Unsafe.class.getDeclaredField("theUnsafe");
+			f.setAccessible(true);
+			return (Unsafe) f.get(null);
+		} catch (Exception e) {
+			/* ... */
+			return null;
+		}
+	}
+
+	static final int tableSizeFor(int cap) {
+		int n = cap - 1;
+		n |= n >>> 1;
+		n |= n >>> 2;
+		n |= n >>> 4;
+		n |= n >>> 8;
+		n |= n >>> 16;
+		return (n < 0) ? 1 : (n >= (1 << 30)) ? (1 << 30) : n + 1;
+	}
 
 	public static void main(String[] args) throws Exception {
 		// testMap();
@@ -23,24 +60,46 @@ public class JDKTest {
 		// testTreeMap();
 		// testWeakHashMap();
 
-		testObjectStreamClass();
+		 testObjectStreamClass();
 
+		// JDKTest test = new JDKTest();
+		// test.testUnSafe();
+
+		// System.out.println(tableSizeFor(33));
+//		testputMapEntries();
+//		System.out.println(Integer.valueOf("110101",2) & Integer.valueOf("101010",2));
+
+	}
+
+	public static void testputMapEntries() {
+
+		Map<String, String> map1 = new HashMap<>();
+		for (int i = 0; i < 10; i++) {
+			map1.put(String.valueOf(i),"");
+		}
+
+		Map<String,String> map2 = new HashMap<>(map1);
+
+	}
+
+	private void testUnSafe() {
+
+		long size1 = size;
+		log(size);
+		log(size1);
+		U.compareAndSwapInt(this, SIZE, 0, 100);
+		log(size);
+		log(size1);
 	}
 
 	public static void testObjectStreamClass() throws Exception {
 
 		ObjectStreamClass streamClass = ObjectStreamClass.lookup(Garbage.class);
-		long startTime = System.currentTimeMillis();
 		log(streamClass.getSerialVersionUID());
-		System.out.println((System.currentTimeMillis() - startTime));
 
-		Field field = ObjectStreamClassDemo.class.getDeclaredField("field");
-		field.setAccessible(true);
-		// 静态变量的获取
-		String value = (String) field.get(null);
-		log(value);
+		ObjectStreamClassDemo classDemo = new ObjectStreamClassDemo();
 
-		getDeclaredSerialFields(ObjectStreamClassDemo.class);
+//		getDeclaredSerialFields(ObjectStreamClassDemo.class);
 
 	}
 
@@ -258,10 +317,7 @@ public class JDKTest {
 
 	private static class ObjectStreamClassDemo implements Serializable {
 
-		private static final String field = "field";
-
 		private static final ObjectStreamField[] serialPersistentFields = new ObjectStreamField[] {
 				new ObjectStreamField("field", String.class) };
-
 	}
 }

@@ -706,13 +706,13 @@ public class ConcurrentHashMap<K,V> extends AbstractMap<K,V>
     transient volatile Node<K,V>[] table;
 
     /**
-     * 当在重新hash设置的过程中不为空，表示为下一次table。其他的情况下为null
+     * 当在扩容的过程中不为空，表示为下一次table。其他的情况下为null
      * The next table to use; non-null only while resizing.
      */
     private transient volatile Node<K,V>[] nextTable;
 
     /**
-     * 
+     *  TODO 暂时不知道是啥意思
      * Base counter value, used mainly when there is no contention（竞争）,
      * but also as a fallback during table initialization
      * races. Updated via CAS.
@@ -736,23 +736,28 @@ public class ConcurrentHashMap<K,V> extends AbstractMap<K,V>
 
     /**
      * The next table index (plus one) to split while resizing.
-     * 符号表下一次resized的索引
+     * 当重新hash设置元素的时候符号表下一次分割的索引(之前的+1),
      */
     private transient volatile int transferIndex;
 
     /**
      * Spinlock (locked via CAS) used when resizing and/or creating CounterCells.
+     * 扩容或者创建CounterCells的重入锁
      */
     private transient volatile int cellsBusy;
 
     /**
+     * TODO ? 暂时还没有弄清楚是干嘛的
      * Table of counter cells. When non-null, size is a power of 2.
      */
     private transient volatile CounterCell[] counterCells;
 
-    // views
+    // views 视图
+    //符号表键的视图
     private transient KeySetView<K,V> keySet;
+    //符号表值的视图
     private transient ValuesView<K,V> values;
+    //符号表键值对的视图
     private transient EntrySetView<K,V> entrySet;
 
 
@@ -765,6 +770,7 @@ public class ConcurrentHashMap<K,V> extends AbstractMap<K,V>
     }
 
     /**
+     * 创建一个大小合适的符号表
      * Creates a new, empty map with an initial table size
      * accommodating the specified number of elements without the need
      * to dynamically resize.
