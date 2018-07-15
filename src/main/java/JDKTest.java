@@ -1,10 +1,18 @@
 import sun.misc.Unsafe;
+import sun.reflect.generics.tree.Wildcard;
 
+import javax.annotation.Resource;
 import java.io.*;
+import java.lang.annotation.Annotation;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.invoke.MethodHandle;
 import java.lang.ref.PhantomReference;
 import java.lang.ref.Reference;
 import java.lang.ref.ReferenceQueue;
 import java.lang.reflect.*;
+import java.net.URL;
+import java.security.ProtectionDomain;
 import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
@@ -14,7 +22,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  * @author luqibao
  * @date 2017/10/25
  */
-public class JDKTest {
+public class JDKTest<K extends Object & Map, V> {
 
     private static Garbage WEAK_HOLDER;
     private static byte[] bytes;
@@ -110,6 +118,19 @@ public class JDKTest {
 //        testFinalize();
 //        testPhantomReference();
 //        testParameterizedType();
+
+//        testTypeVariable();
+
+
+//        testGenericArrayType();
+
+
+//        testWildcard();
+
+//        testClass();
+
+        testMethod();
+
     }
 
 
@@ -598,14 +619,345 @@ public class JDKTest {
         }
     }
 
-    public void method1(List<String> list) {
+    public static void testTypeVariable() {
+
+
+        JDKTest<FinalizeClass, FinalizeClass> jdkTest = new JDKTest<>();
+
+        Type[] types = jdkTest.getClass().getTypeParameters();
+
+        /*
+         * print :
+         * =================================
+         * class JDKTest
+         * =================================
+         * interface java.util.Map
+         * =================================
+         * K
+         * =================================
+         * class JDKTest
+         * =================================
+         * class java.lang.Object
+         * =================================
+         * V
+         */
+        for (Type type : types) {
+
+            TypeVariable typeVariable = (TypeVariable) type;
+            log(typeVariable.getGenericDeclaration());
+
+            //获取类型参数的父类(T extends Class)
+            log(((TypeVariable) type).getBounds()[((TypeVariable) type).getBounds().length - 1]);
+
+            log(((TypeVariable) type).getName());
+        }
+
     }
+
+
+    K[][] k;
+
+
+    public static void testGenericArrayType() throws Exception {
+
+        Field field = JDKTest.class.getDeclaredField("k");
+        Type type = field.getGenericType();
+        /* print:
+         *  =================================
+         *  K[]
+         */
+        log(((GenericArrayType) type).getGenericComponentType());
+
+    }
+
+
+    public static void testWildcard() throws Exception {
+
+        Method method = JDKTest.class.getMethod("method3", Class.class);
+        Type[] types = method.getGenericParameterTypes();
+        ParameterizedType parameterizedType = (ParameterizedType) types[0];
+        types = parameterizedType.getActualTypeArguments();
+        WildcardType wildcardType = (WildcardType) types[0];
+
+        log(wildcardType);//? super java.lang.Float
+        log(wildcardType.getLowerBounds()[0]); //class java.lang.Float
+
+
+        Method method1 = JDKTest.class.getMethod("method4", Class.class);
+        types = method1.getGenericParameterTypes();
+        parameterizedType = (ParameterizedType) types[0];
+        types = parameterizedType.getActualTypeArguments();
+        wildcardType = (WildcardType) types[0];
+
+        log(wildcardType);//? extends java.lang.Float
+        log(wildcardType.getUpperBounds()[0]); //class java.lang.Float
+
+
+    }
+
+
+    public void method3(Class<? super Float> clazz) {
+    }
+
+    public void method4(Class<? extends Float> clazz) {
+
+    }
+
+    public static void testClass() throws Exception {
+
+        Class clazz = Class.forName("SeriaClass");
+        System.out.println(clazz.getName());
+
+//        Class  clazz2 = Class.forName("SupperSeriaClass",true,Thread.currentThread().getContextClassLoader());
+//        System.out.println(clazz2.getName());
+
+        Method method = Class.class.getDeclaredMethod("forName0", String.class, boolean.class, ClassLoader.class, Class.class);
+        method.setAccessible(true);
+
+
+        Class class2 = (Class) method.invoke(null, "SupperSeriaClass", true, Thread.currentThread().getContextClassLoader(), System.class);
+        Object ob = class2.newInstance();
+
+        //返回是否可以使用断言
+        log(class2.desiredAssertionStatus());
+        assert 1 == 2;
+
+        enumDemo[] enumDemos = enumDemo.class.getEnumConstants();
+        for (enumDemo demo : enumDemos) {
+            log(demo);
+        }
+
+        log("isInterface = " + class2.isInterface());
+
+        log("isInstance = " + class2.isInstance(ob));
+
+        //判断class2 是不是Object相同的或者超类
+        log(class2.isAssignableFrom(Object.class));
+
+        //class3 是不是SupperSeriaClass.class的 超类
+        Class class3 = Object.class;
+        log(class3.isAssignableFrom(SupperSeriaClass.class));
+
+
+        log(class3.isAssignableFrom(Object.class));
+
+        log("isArray = " + enumDemos.getClass().isArray());
+
+        log("primitive = " + int.class.isPrimitive());
+
+        log("isAnnotation = " + JDKTest.class.isAnnotation());
+
+        log("isSynthetic = " + JDKTest.class.isSynthetic());
+
+        Class<?> cLass4 = JDKTest.class.getSuperclass();
+        log("super class = " + cLass4.getName());
+
+
+        //TODO getGenericSuperclass方法没看明白
+        Type type = JDKTest.class.getGenericSuperclass();
+        log(type);//class java.lang.Object
+
+        type = AbstractMap.class.getGenericSuperclass();
+        log(type);//class java.lang.Object
+
+        type = int.class.getGenericSuperclass();
+        log(type);//null
+
+        type = Object.class.getGenericSuperclass();
+        log(type);//null
+
+        log("package = " + String.class.getPackage().getName());//package = java.lang
+
+        log("interfaces = " + Arrays.asList(HashMap.class.getInterfaces()));//interfaces = [interface java.util.Map, interface java.lang.Cloneable, interface java.io.Serializable]
+
+
+        Map<String, String> mapObj = new AbstractMap<String, String>() {
+            @Override
+            public Set<Entry<String, String>> entrySet() {
+                return null;
+            }
+        };
+
+        //返回局部类和匿名类的所在方法
+        log(mapObj.getClass().getEnclosingMethod());//public static void JDKTest.testClass() throws java.lang.Exception
+
+        log(JDKTest.class.getEnclosingMethod());//null
+
+        class localClass {
+        }
+
+        log(JDKTest.class.getEnclosingMethod());//null
+        log(localClass.class.getEnclosingMethod());//public static void JDKTest.testClass() throws java.lang.Exception
+
+
+        //所有定义的类
+        /* print:
+         *  c = class JDKTest$ObjectStreamClassDemo
+            =================================
+            c = class JDKTest$Garbage
+            =================================
+            c = class JDKTest$LogFile
+            =================================
+            c = class JDKTest$FinalizeClass
+            =================================
+            c = class JDKTest$enumDemo
+            =================================
+            c = class JDKTest$HashCode
+         * */
+        Class[] classes = JDKTest.class.getDeclaredClasses();
+        for (Class c : classes) {
+            log("c = " + c);
+        }
+
+
+        //所有定义的字段
+        /*
+         *  f= private static JDKTest$Garbage JDKTest.WEAK_HOLDER
+            =================================
+            f= private static byte[] JDKTest.bytes
+            =================================
+            f= private static final sun.misc.Unsafe JDKTest.U
+            =================================
+            f= private volatile long JDKTest.size
+            =================================
+            f= private static final long JDKTest.SIZE
+            =================================
+            f= java.lang.Object[][] JDKTest.k
+            =================================
+            f= java.util.Map JDKTest.aClass
+            =================================
+            f= private static volatile boolean JDKTest.hasGarbage
+            =================================
+            f= static final boolean JDKTest.$assertionsDisabled
+         * */
+        Field[] fields = JDKTest.class.getDeclaredFields();
+        for (Field field : fields) {
+            log("f= " + field);
+        }
+
+        //所有的方法
+        Method[] methods = JDKTest.class.getDeclaredMethods();
+        for (Method m : methods) {
+            log("m = " + m);
+        }
+
+//        所有的构造函数
+        Constructor[] constructors = JDKTest.class.getDeclaredConstructors();
+        for (Constructor constructor : constructors) {
+            log(constructor); //public JDKTest()
+        }
+
+
+        ProtectionDomain protectionDomain = JDKTest.class.getProtectionDomain();
+        log("protectionDomain = " + protectionDomain);
+
+
+        URL url = JDKTest.class.getResource("Class.md");
+        log("url = " + url);
+    }
+
+    public static void testMethod() throws Exception {
+
+        Method method = JDKTest.class.getMethod("method1", List.class);
+
+        Field field = Method.class.getDeclaredField("slot");
+        field.setAccessible(true);
+        log("slot = " + field.getInt(method));
+
+
+        field = Method.class.getDeclaredField("annotations");
+        field.setAccessible(true);
+        log("annotations = " + field.get(method));
+
+        log("declaringClass = " + method.getDeclaringClass());
+
+        Annotation[] annotations = method.getAnnotations();
+        for (Annotation annotation : annotations) {
+            log("annotation  = " + annotation);
+        }
+
+        log("name = " + method.getName());
+
+        log("modifiers = " + method.getModifiers());
+
+        //如果参数是范型的话 那么返回类型参数（类似 K V ） @see  testTypeVariable
+        TypeVariable typeVariable[] = method.getTypeParameters();
+        for (TypeVariable tv : typeVariable) {
+            log(tv);
+        }
+
+        Class<?> type = method.getReturnType();
+        log("returnType = " + type);
+
+        //返回的是 方法返回值的标准表示
+        log("genericReturnType = " + method.getGenericReturnType());
+
+        log("count = " + method.getParameterCount());
+
+        //
+        Type[] types = method.getGenericParameterTypes();
+        for (Type t : types) {
+            log(t);
+        }
+
+
+        types = method.getGenericExceptionTypes();
+        for (Type t:types){
+            log("e = " + t);
+        }
+
+        log(method);
+
+        log("generic string = " + method.toGenericString());
+
+        log("bridge = "+method.isBridge());
+
+        log("varArgs = "+method.isVarArgs());
+
+        //TODO ?
+        log("default value = " + method.getDefaultValue());
+
+
+
+
+
+    }
+
+
+    Map aClass;
+
+    private enum enumDemo {
+
+        YES(),
+        NO(),
+
+    }
+
+    @Annotation1
+    public void method1(@Annotation1 List<String> list) {
+    }
+
+
+    @Retention(RetentionPolicy.RUNTIME)
+    @interface Annotation1{
+
+        String value() default "123";
+    }
+
+
+    int i =10;
+    public int method4(){
+
+        return 10;
+    }
+
 
     public void method2(Map.Entry<String, Integer> entry) {
     }
 
+    private static class FinalizeClass extends AbstractMap {
 
-    private static class FinalizeClass {
+
         private byte[] bytes = new byte[1024 * 1024 * 1024];
 
         @Override
@@ -614,6 +966,11 @@ public class JDKTest {
             bytes = null;
             //@see Finalizer
             super.finalize();
+        }
+
+        @Override
+        public Set<Entry> entrySet() {
+            return null;
         }
     }
 
