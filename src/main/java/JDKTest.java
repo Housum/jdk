@@ -119,7 +119,7 @@ public class JDKTest<K extends Object & Map, V> {
 //        testPhantomReference();
 //        testParameterizedType();
 
-//        testTypeVariable();
+        testTypeVariable();
 
 
 //        testGenericArrayType();
@@ -129,7 +129,7 @@ public class JDKTest<K extends Object & Map, V> {
 
 //        testClass();
 
-        testMethod();
+//        testMethod();
 
     }
 
@@ -624,30 +624,43 @@ public class JDKTest<K extends Object & Map, V> {
 
         JDKTest<FinalizeClass, FinalizeClass> jdkTest = new JDKTest<>();
 
+        //获取类型参数
         Type[] types = jdkTest.getClass().getTypeParameters();
 
         /*
          * print :
-         * =================================
-         * class JDKTest
-         * =================================
-         * interface java.util.Map
-         * =================================
-         * K
-         * =================================
-         * class JDKTest
-         * =================================
-         * class java.lang.Object
-         * =================================
-         * V
+        =================================
+        class JDKTest
+        =================================
+        interface java.util.Map
+        =================================
+        t = class java.lang.Object
+        =================================
+        t = interface java.util.Map
+        =================================
+        K
+        =================================
+        class JDKTest
+        =================================
+        class java.lang.Object
+        =================================
+        t = class java.lang.Object
+        =================================
+        V
          */
         for (Type type : types) {
 
             TypeVariable typeVariable = (TypeVariable) type;
             log(typeVariable.getGenericDeclaration());
 
-            //获取类型参数的父类(T extends Class)
-            log(((TypeVariable) type).getBounds()[((TypeVariable) type).getBounds().length - 1]);
+            //获取类型参数的具体类型的上限
+            log(typeVariable.getBounds()[typeVariable.getBounds().length - 1]);
+
+            types = typeVariable.getBounds();
+
+            for (Type t:types){
+                log("t = " + t);
+            }
 
             log(((TypeVariable) type).getName());
         }
@@ -755,6 +768,9 @@ public class JDKTest<K extends Object & Map, V> {
 
         //TODO getGenericSuperclass方法没看明白
         Type type = JDKTest.class.getGenericSuperclass();
+
+        log("int.class = "+int.class.getGenericSuperclass());
+
         log(type);//class java.lang.Object
 
         type = AbstractMap.class.getGenericSuperclass();
@@ -854,6 +870,18 @@ public class JDKTest<K extends Object & Map, V> {
 
         URL url = JDKTest.class.getResource("Class.md");
         log("url = " + url);
+
+
+        Class<?> clazz1 = int[].class;
+        log(clazz1.getName());
+
+        log("toGenericString  = " + JDKTest.class.toGenericString());
+
+
+        //see @java.lang.Class.classLoader
+        Field field = JDKTest.class.getDeclaredField("classLoader");
+        field.setAccessible(true);
+        log(field);
     }
 
     public static void testMethod() throws Exception {
@@ -902,7 +930,7 @@ public class JDKTest<K extends Object & Map, V> {
 
 
         types = method.getGenericExceptionTypes();
-        for (Type t:types){
+        for (Type t : types) {
             log("e = " + t);
         }
 
@@ -910,15 +938,12 @@ public class JDKTest<K extends Object & Map, V> {
 
         log("generic string = " + method.toGenericString());
 
-        log("bridge = "+method.isBridge());
+        log("bridge = " + method.isBridge());
 
-        log("varArgs = "+method.isVarArgs());
+        log("varArgs = " + method.isVarArgs());
 
         //TODO ?
         log("default value = " + method.getDefaultValue());
-
-
-
 
 
     }
@@ -939,14 +964,15 @@ public class JDKTest<K extends Object & Map, V> {
 
 
     @Retention(RetentionPolicy.RUNTIME)
-    @interface Annotation1{
+    @interface Annotation1 {
 
         String value() default "123";
     }
 
 
-    int i =10;
-    public int method4(){
+    int i = 10;
+
+    public int method4() {
 
         return 10;
     }

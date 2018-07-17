@@ -1,4 +1,4 @@
-###类型变量 在范型中，定义的参数 比如： Map<K,V> 那么 TypeVariable 为K,V两个
+###标示为类型参数(TypeParameter) 在范型中，定义的参数 比如： Map<K,V> 那么 TypeVariable 为K,V两个
 
 ```
 /**

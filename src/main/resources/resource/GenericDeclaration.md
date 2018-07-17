@@ -1,5 +1,7 @@
-###能够定时类型变量的功能接口 （目前只有Class Method Constructor） 
- 
+###只有实现了该类，才能够定义类型参数的功能
+
+ 目前只有Class Method Constructor
+  
  ```
  package java.lang.reflect;
  
@@ -11,7 +13,7 @@
  public interface GenericDeclaration extends AnnotatedElement {
  
  
-      //获取定义的类型变量 比如：Map<K,V> 那么就是K 以及V  @see TypeVailable.md
+      //获取定义的类型参数 比如：Map<K,V> 那么就是K 以及V  @see TypeVailable.md
      public TypeVariable<?>[] getTypeParameters();
  }
 

@@ -1,4 +1,6 @@
-### 有通配符存在的范型 比如： <? extends Clazz> 
+### 有通配符存在的范型
+
+ 比如： <? extends Clazz>
 
 ```
 public interface WildcardType extends Type {
