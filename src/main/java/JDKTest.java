@@ -1,12 +1,8 @@
 import sun.misc.Unsafe;
-import sun.reflect.generics.tree.Wildcard;
+import sun.reflect.annotation.AnnotationType;
 
-import javax.annotation.Resource;
 import java.io.*;
-import java.lang.annotation.Annotation;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.invoke.MethodHandle;
+import java.lang.annotation.*;
 import java.lang.ref.PhantomReference;
 import java.lang.ref.Reference;
 import java.lang.ref.ReferenceQueue;
@@ -119,7 +115,7 @@ public class JDKTest<K extends Object & Map, V> {
 //        testPhantomReference();
 //        testParameterizedType();
 
-        testTypeVariable();
+//        testTypeVariable();
 
 
 //        testGenericArrayType();
@@ -130,6 +126,9 @@ public class JDKTest<K extends Object & Map, V> {
 //        testClass();
 
 //        testMethod();
+
+
+        testInvocationHandler();
 
     }
 
@@ -658,7 +657,7 @@ public class JDKTest<K extends Object & Map, V> {
 
             types = typeVariable.getBounds();
 
-            for (Type t:types){
+            for (Type t : types) {
                 log("t = " + t);
             }
 
@@ -769,7 +768,7 @@ public class JDKTest<K extends Object & Map, V> {
         //TODO getGenericSuperclass方法没看明白
         Type type = JDKTest.class.getGenericSuperclass();
 
-        log("int.class = "+int.class.getGenericSuperclass());
+        log("int.class = " + int.class.getGenericSuperclass());
 
         log(type);//class java.lang.Object
 
@@ -879,9 +878,72 @@ public class JDKTest<K extends Object & Map, V> {
 
 
         //see @java.lang.Class.classLoader
-        Field field = JDKTest.class.getDeclaredField("classLoader");
-        field.setAccessible(true);
-        log(field);
+//        Field field = JDKTest.class.getDeclaredField("classLoader");
+//        field.setAccessible(true);
+//        log(field);
+
+
+        /*
+        * annotationType = sun.reflect.annotation.AnnotatedTypeFactory$AnnotatedTypeBaseImpl@78308db1
+        =================================
+        type = interface JDKTest$Foo1
+            * */
+        AnnotatedType[] annotatedTypes = Foo.class.getAnnotatedInterfaces();
+        for (AnnotatedType annotationType : annotatedTypes) {
+            log("annotationType = " + annotationType);
+            log("type = " + annotationType.getType());
+        }
+
+
+        AnnotatedType annotatedType = Foo.class.getAnnotatedSuperclass();
+        log("annotatedType0 = " + annotatedType);
+        //type0 = class JDKTest$Foo2
+        log("type0 = " + (annotatedType == null ? "" : annotatedType.getType()));
+
+
+        method = JDKTest.class.getMethod("getFoo", Integer.class);
+
+        AnnotatedType annotatedType1 = method.getAnnotatedReturnType();
+
+        log("annotatedType1 = " + annotatedType1);
+        //class java.lang.String
+        log("type1 = " + (annotatedType1 == null ? "" : annotatedType1.getType()));
+
+
+        annotatedTypes = method.getAnnotatedParameterTypes();
+
+        for (AnnotatedType annotatedType2 : annotatedTypes) {
+            log("annotatedType2 = " + annotatedType2);
+            //type2 = class java.lang.Integer
+            log("type2 = " + annotatedType2.getType());
+        }
+
+
+        annotatedTypes = method.getAnnotatedExceptionTypes();
+        for (AnnotatedType annotatedType3 : annotatedTypes) {
+            log("annotatedType3 = " + annotatedType3);
+            //type3 = class java.lang.Exception
+            log("type3 = " + annotatedType3.getType());
+        }
+
+
+        AnnotatedType annotatedType4 = method.getAnnotatedReceiverType();
+        log("annotatedType4 = " + annotatedType4);
+        //type4 = class JDKTest
+        log("type4 = " + annotatedType4.getType());
+
+
+        Field[] fields1 = Foo.class.getDeclaredFields();
+        for (Field field : fields1) {
+            log("ff = " + field);
+        }
+
+
+        Field[] fields2 = Foo.class.getFields();
+        for (Field field : fields2) {
+            log("ff1 = " + field);
+        }
+
     }
 
     public static void testMethod() throws Exception {
@@ -948,6 +1010,90 @@ public class JDKTest<K extends Object & Map, V> {
 
     }
 
+    public static void testInvocationHandler() {
+
+        /*
+        *   =================================
+            before
+            =================================
+            foo3
+            =================================
+            after
+            =================================
+            class name = $Proxy0
+        * */
+        Foo3 foo3 = new Foo4();
+
+        Foo5 foo5= new Foo5(foo3);
+
+        Foo3 foo31 = (Foo3)Proxy.newProxyInstance(Thread.currentThread().getContextClassLoader(),
+                foo3.getClass().getInterfaces(),foo5);
+        foo31.foo(1);
+        log("class name = " + foo31.getClass().getName());
+    }
+
+    private interface Foo3 {
+        void foo(int i );
+    }
+
+    private static class Foo4 implements Foo3 {
+        @Override
+        public void foo(int i) {
+            log("foo3");
+        }
+    }
+
+    private static class Foo5 implements InvocationHandler {
+
+        Foo3 foo3;
+        public Foo5(Foo3 foo3){
+            this.foo3 = foo3;
+        }
+
+        @Override
+        public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
+//            log("proxy = " + proxy);
+//            log("method = " + method);
+//            log("args = " + args);
+            log("before ");
+            Object returnValue = method.invoke(foo3,args);
+//            log("returnValue = " + returnValue);
+            log("after");
+            return returnValue;
+        }
+    }
+
+
+    @Retention(RetentionPolicy.RUNTIME)
+    @Target(value = {ElementType.ANNOTATION_TYPE,
+            ElementType.CONSTRUCTOR, ElementType.FIELD, ElementType.LOCAL_VARIABLE, ElementType.METHOD, ElementType.PACKAGE,
+            ElementType.PARAMETER, ElementType.TYPE, ElementType.TYPE_PARAMETER,
+            ElementType.TYPE_USE})
+    @interface Constom {
+
+    }
+
+
+    @Constom
+    private static class Foo extends @Constom Foo2 implements @Constom Foo1 {
+
+        int i;
+        public int k;
+
+    }
+
+    interface Foo1 {
+
+    }
+
+    private static class Foo2 {
+        int j;
+        public int m;
+    }
+
+    public @Constom String getFoo(JDKTest<K, V>this, @Constom Integer i) throws @Constom Exception {
+        return "";
+    }
 
     Map aClass;
 
