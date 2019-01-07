@@ -1,0 +1,36 @@
+Reference 类主要的作用
+1.这是一个抽象类，根据源码中的叙述表示的是JAVA中对象的引用
+2.Reference的具体子类都是给VM调用的。具体的说法就是如果是WeakReference的话，那么就是弱引用：
+当对象不可达的时候,那么对象将会被回收;如果StrongReference的话,那么当堆内存不够使用的时候那么
+对这部分对象进行回收；如果是PhantomReference的话,那么下一次GC的时候将会被回收（其实它并不能被使用，只能
+作为一个GC回收的标记）；
+3.对于Reference GC是特殊处理，就是说回收之后的对象都会放入Queue中（如果构造参数传入了的话）
+4.Reference源码分析：
+（1）
+Reference状态机
+Active -> Pending -> Queue -> InActive
+       -> InActive
+状态：
+Active 当Reference对象被创建的时候为这个状态，如果对象被要被回收的话，那么状态变为 InActive或者Pending
+Pending 当对象要被回收的时候，如果创建的时候有传入ReferenceQueue的时候，那么先到这个状态等待放入到ReferenceQueue中
+Queue 对象被放入到ReferenceQueue中
+InActive 当被ReferenceQueue移除，或者回收（取决与是否传入ReferenceQueue）
+（2）
+Reference的属性
+T referent ：对象
+queue ：存放那些被回收的对象
+next ：
+/* When active:   NULL 如果是active的时候，那么是NULL
+ *     pending:   this 如果是pending的时候 那么指向的是本身
+ *    Enqueued:   next reference in queue (or this if last) 对象被放入到ReferenceQueue中的是,那么next指向的是队列的下一个元素
+ *    Inactive:   this 当被ReferenceQueue移除的话，那么变为这个状态
+ */
+discovered:
+（1）直接被VM使用，主要的作用是VM能过直接获取到这部分数据可以直接用来被GC处理
+（2）在pending的情况下，存放的是下一个被放入Queue的元素
+5.生命周期
+(1)Reference被创建 -> discovered暴露被VM,GC发现对象可以被回收 -> 刚入到pending队列中 -> 被后台线程放入到 queue中 -> 被移除 -> 回收
+(2)Reference被创建 -> discovered暴露被VM,GC发现对象可以被回收 -> 回收
+
+6.Finalizer 特殊类型的Reference
+这个引用主要做的是调用垃圾回收之前对象执行对象的finalize()方法（所以在对象的第一次回收的时候能够拯救自己就是从这里来的）

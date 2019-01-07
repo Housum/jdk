@@ -1,0 +1,69 @@
+Throwable解读
+
+1.在JAVA中所有异常和错误的基类，只有它或者它的子类才能够
+被JAVA中throw抛出,它的两个子类Exception和Error作为两种主要的类型。
+异常可以通过message记录产生异常的原因，或者通过cause保存
+
+2.主要的方法
+(1).addSuppressed() 添加被抑制的关联异常，可以把这部分的异常给传播出去
+eg:
+/*
+*Exception exception = new RuntimeException("run1");
+*exception.addSuppressed(new RuntimeException("run2"));
+*exception.addSuppressed(new RuntimeException("run3"));
+*/
+//output
+/*
+*Exception in thread "main" java.lang.RuntimeException: run1
+ 	at JDKTest.main(JDKTest.java:193)
+ 	Suppressed: java.lang.RuntimeException: run2
+ 		at JDKTest.main(JDKTest.java:194)
+ 	Suppressed: java.lang.RuntimeException: run3
+ 		at JDKTest.main(JDKTest.java:195)
+*/
+(2).initCause(Throwable) 将产生的异常原因保存
+
+(3).getStackTrace() 抛出异常的时候的堆栈保存起来，这个方法就是获得堆栈。返回的数组
+展示了栈帧的一个顺序，如果返回的数组不是为空的话，那么第一个元素就是栈顶（就是抛出异常的地方的方法）
+最后一个元素是栈底（就是开始调用的那个方法）
+
+(4).fillInStackTrace 这个方法一般都是被构造方法调用，内部native方法将当前运行的堆栈保存，用户代码也可以将当前运行
+的栈帧保存进行 @see JDKTest.testFillInStackTrace
+
+3.字段
+在它内部的字段有协议约定：
+内部的字段都会被设置成一个哨兵值，这个在逻辑上看起来是这个字段未被初始化；
+将某个字段设置为null的话嘛，那么标示这个字段在接下来不能为设置成其他值了；
+字段的哨兵值可以被一个非null的值替换。
+
+(1).private Throwable cause = this; 如果存在话，那么表示的是这个异常关联的异常如果是this的话，
+逻辑表示的是没有
+(2).private List<Throwable> suppressedExceptions = SUPPRESSED_SENTINEL;被抑制的异常（不知道怎么翻译）
+它的作用就是将多个异常进行传播出去.@see 2.(1)。如果没有被设置值的话，那么就是为哨兵值
+(3).private StackTraceElement[] stackTrace = UNASSIGNED_STACK 抛出异常或者错误的时候的堆栈。
+@see 2.(4)。 如果没有被设置值，那么默认设置的是哨兵值
+(4).  private String detailMessage;   抛出错误或者异常的时候保存的信息，默认没有任何的信息，可以通过
+构造函数传入
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

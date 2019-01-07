@@ -1,5 +1,5 @@
 import sun.misc.Unsafe;
-import sun.reflect.annotation.AnnotationType;
+import sun.misc.VM;
 
 import java.io.*;
 import java.lang.annotation.*;
@@ -58,7 +58,7 @@ public class JDKTest<K extends Object & Map, V> {
         return (n < 0) ? 1 : (n >= (1 << 30)) ? (1 << 30) : n + 1;
     }
 
-    public static void main(String[] args) throws Exception {
+    public static void main(String[] args) throws Throwable {
         // testMap();
         // testCollections();
         // testType();
@@ -128,10 +128,152 @@ public class JDKTest<K extends Object & Map, V> {
 //        testMethod();
 
 
-        testInvocationHandler();
+//        testInvocationHandler();
+
+//        System.out.println(Base64.getEncoder().encode(new String("你好".getBytes("UTF-16"), "GB2312").getBytes()));
+
+
+//        Character.UnicodeBlock unicodeBlock = Character.UnicodeBlock.of(120);
+//        if (unicodeBlock == Character.UnicodeBlock.BASIC_LATIN) {
+//            System.out.println("ASCII");
+//        }
+
+//
+//        int active = Thread.activeCount();
+//        Thread[] arr = new Thread[active];
+//        Thread.enumerate(arr);
+//        System.out.println(arr.length);
+//
+//        Thread thread = new Thread() {
+//            @Override
+//            public void run() {
+//                System.out.println("1");
+//            }
+//        };
+//
+//        thread.start();
+//
+//        ClassLoader classLoader = thread.getContextClassLoader();
+//
+//
+//        StackTraceElement[] stackTraceElements = thread.getStackTrace();
+//
+//        ThreadLocal<String> stringThreadLocal = ThreadLocal.withInitial(() -> "1234");
+//
+//
+//        new Thread() {
+//            @Override
+//            public void run() {
+//                System.out.println(stringThreadLocal.get());
+//                System.out.println("inner : " + Thread.currentThread().getName());
+//            }
+//        }.start();
+//
+//        System.out.println(Thread.currentThread().getName());
+
+//        new Thread(() -> new TreadLocalDemo().run()).start();
+//
+//        synchronized (JDKTest.class) {
+//            JDKTest.class.wait();
+//        }
+
+        /*
+         * output
+         * Thread-0 threadLocal inheritableThreadLocal
+         * Thread-1 threadLocal 0-0
+         * Thread-2 threadLocal 0-0
+         * Thread-3 threadLocal 0-0
+         * Thread-4 threadLocal 0-0
+         * Thread-5 threadLocal 0-0
+         * Thread-6 threadLocal 0-0
+         * Thread-7 threadLocal 0-0
+         */
+
+//        testThrowableSuppressed();
+
+//        testFillInStackTrace();
+
 
     }
 
+
+    private static void testFillInStackTrace() throws Throwable{
+
+        Throwable throwable = new Throwable("th");
+        helpTestFillInStackTrace(throwable);
+    }
+
+    private static void helpTestFillInStackTrace(Throwable throwable) throws Throwable{
+        //1.如果没有注释
+        /*
+         *Exception in thread "main" java.lang.Throwable: th
+            at JDKTest.helpTestFillInStackTrace(JDKTest.java:207)
+            at JDKTest.testFillInStackTrace(JDKTest.java:202)
+	        at JDKTest.main(JDKTest.java:194)
+         */
+        throwable.fillInStackTrace();
+        //2.如果注释掉的话
+        /*
+        Exception in thread "main" java.lang.Throwable: th
+        at JDKTest.testFillInStackTrace(JDKTest.java:201)
+        at JDKTest.main(JDKTest.java:194)
+	      */
+        throw throwable;
+    }
+
+    private static void testThrowableSuppressed() throws Exception{
+        /*
+        * Exception in thread "main" java.lang.RuntimeException: run1
+	at JDKTest.testThrowableSuppressed(JDKTest.java:199)
+	at JDKTest.main(JDKTest.java:192)
+	Suppressed: java.lang.RuntimeException: run2
+		at JDKTest.testThrowableSuppressed(JDKTest.java:200)
+		... 1 more
+	Suppressed: java.lang.RuntimeException: run3
+		at JDKTest.testThrowableSuppressed(JDKTest.java:201)
+		... 1 more
+        * */
+        Exception exception = new RuntimeException("run1");
+        exception.addSuppressed(new RuntimeException("run2"));
+        exception.addSuppressed(new RuntimeException("run3"));
+        throw exception;
+    }
+
+
+//    static {
+//        Properties properties = new Properties();
+//        properties.setProperty("java.lang.Integer.IntegerCache.high", Integer.MAX_VALUE + "");
+//        VM.saveAndRemoveProperties(properties);
+//    }
+
+
+    private static class TreadLocalDemo {
+
+        private static ThreadLocal<String> threadLocal = ThreadLocal.withInitial(() -> "threadLocal");
+        private static ThreadLocal<String> inheritableThreadLocal = new InheritableThreadLocal<String>() {
+            @Override
+            protected String initialValue() {
+                return "inheritableThreadLocal";
+            }
+        };
+        private static volatile boolean fork = false;
+
+        public void run() {
+            if (fork) return;
+            System.out.println(Thread.currentThread().getName() + " " + threadLocal.get() + " " + inheritableThreadLocal.get());
+            inheritableThreadLocal.set("0-0");
+            threadLocal.set("--");
+            new Thread(() -> new TreadLocalDemo().run()).start();
+            synchronized (this) {
+                try {
+                    this.wait(1);
+                } catch (Exception e) {
+                }
+            }
+            fork = true;
+        }
+
+    }
 
     private static void testSecurityManager() {
         System.clearProperty("java.version");
@@ -553,6 +695,9 @@ public class JDKTest<K extends Object & Map, V> {
 
 
         t1.start();
+        Thread.sleep(1000);
+        log("main status = " + t1.isInterrupted());
+
         t1.interrupt();
         t1.join();
     }
@@ -1024,16 +1169,16 @@ public class JDKTest<K extends Object & Map, V> {
         * */
         Foo3 foo3 = new Foo4();
 
-        Foo5 foo5= new Foo5(foo3);
+        Foo5 foo5 = new Foo5(foo3);
 
-        Foo3 foo31 = (Foo3)Proxy.newProxyInstance(Thread.currentThread().getContextClassLoader(),
-                foo3.getClass().getInterfaces(),foo5);
+        Foo3 foo31 = (Foo3) Proxy.newProxyInstance(Thread.currentThread().getContextClassLoader(),
+                foo3.getClass().getInterfaces(), foo5);
         foo31.foo(1);
         log("class name = " + foo31.getClass().getName());
     }
 
     private interface Foo3 {
-        void foo(int i );
+        void foo(int i);
     }
 
     private static class Foo4 implements Foo3 {
@@ -1046,7 +1191,8 @@ public class JDKTest<K extends Object & Map, V> {
     private static class Foo5 implements InvocationHandler {
 
         Foo3 foo3;
-        public Foo5(Foo3 foo3){
+
+        public Foo5(Foo3 foo3) {
             this.foo3 = foo3;
         }
 
@@ -1056,7 +1202,7 @@ public class JDKTest<K extends Object & Map, V> {
 //            log("method = " + method);
 //            log("args = " + args);
             log("before ");
-            Object returnValue = method.invoke(foo3,args);
+            Object returnValue = method.invoke(foo3, args);
 //            log("returnValue = " + returnValue);
             log("after");
             return returnValue;

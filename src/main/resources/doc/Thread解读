@@ -1,0 +1,41 @@
+Thread解读
+Thread在JVM中的含义表示的是一个线程，也就是说可以通过他实现多线程
+1.对于使用Thread有两种实现多线程：
+一种是覆盖run方法，在run方法中实现任务代码
+另外的一种是传入Runnable到构造函数中（其实内部还是在run触发Runnable的run方法）
+
+2.Thread主要的几个方法：
+(1). start 启动线程，native方法将会触发run方法
+(2). interrupt 对于在wait，stop，join中的堵塞的线程使用中断方法，那么会抛出InterruptException
+并且中断状态被清理。 使用Thread.interrupted 返回中断状态并且清理中断状态，isInterrupt 返回是否中断但是
+不清理中断状态
+(3) .run 当执行start方法的时候，JVM将会调用该run方法。默认执行target，如果是通过start执行的run方法
+那么是并发执行的。但是直接调用run方法则不是
+(4) join 当执行join的时候，那么表示的是执行该方法的线程等待方法所属的线程执行完毕
+
+
+
+3.Thread属性
+(1).Runnable target
+指定的Runnable，同步逻辑接口
+
+(2).ThreadGroup group
+ThreadGroup 集合了通用的一些线程逻辑以及属性涉及，详情待分析ThreadGroup
+
+(3).ThreadLocal.ThreadLocalMap threadLocals
+线程的ThreadLocalMap，如果线程使用了ThreadLocal的话，那么就会存在一个ThreadLocalMap
+ThreadLocalMap中存放了ThreadLocal作为key，ThreadLocal的值作为value
+
+(4)ThreadLocal.ThreadLocalMap inheritableThreadLocals
+如果线程使用了inheritableThreadLocal的话，那么就会存在一个针对于线程可继承的
+ThreadLocalMap，其他都是和（3）一样
+
+(5) UncaughtExceptionHandler uncaughtExceptionHandler
+非检查异常处理器 ThreadGroup是一个UncaughtExceptionHandler
+
+
+
+
+
+
+

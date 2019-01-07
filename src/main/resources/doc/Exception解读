@@ -1,0 +1,10 @@
+Exception解读
+
+1.继承Throwable，是应用代码预料到的异常，应该捕获，其中异常也分为两种
+一种是检查异常（非RuntimeException），一种是非检查异常（RuntimeException）。
+检查异常需要在方法处定义throws，非检查异常就不需要
+
+
+
+
+

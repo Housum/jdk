@@ -1,0 +1,38 @@
+ThreadLocal解读
+1.功能
+(1).该类的主要功能是可以作为线程本地变量来使用，和其他变量的使用不通，
+变量是通过get和set方法获取
+(2).使用场景就是线程私有的变量
+
+2.实现原理
+使用的是ThreadLocalMap实现，每一个线程都有一个ThreadLocal.ThreadLocalMap threadLocals以及
+ThreadLocal.ThreadLocalMap inheritableThreadLocals(这两个区别后面细讲)。ThreadLocalMap是一个
+特别为ThreadLocal设计的HashMap，key存放的是ThreadLocal，value设置的是值
+
+3.ThreadLocal与InheritableThreadLocal的区别
+看名称应该知道一个是可以继承的，一个是不能被继承，对于InheritableThreadLocal，子线程可以
+继承父线程的InheritableThreadLocal中的值，实现的原理当定义InheritableThreadLocal的时候
+1.初始化Thread的时候 初始化字段inheritableThreadLocals，
+该Thread的子Thread创建的时候将copy父Thread的字段InheritableThreadLocal，最后
+子Thread获取InheritableThreadLocal的时候，将会从自己的字段inheritableThreadLocals中获取，所以才能实现继承
+
+4.主要的方法
+（1）protected T initialValue()
+初始化值，默认返回null，可以通过覆盖这个方法实现初始化默认值
+（2）get（）
+获取值
+（3）set（T）
+设置值
+
+
+5.静态内部类
+ThreadLocalMap 存储ThreadLocal的hash表。
+作为Thread的字段，key为ThreadLocal，value就是ThreadLocal的值（
+但是value是被WeakReference保证过的值，所以是弱引用的，即当线程死掉之后，大概率
+会丢掉root链，所以会被清理掉）
+
+
+
+
+
+

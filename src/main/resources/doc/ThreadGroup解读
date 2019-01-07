@@ -1,0 +1,30 @@
+ThreadGroup解读
+1.功能：
+它的功能就是Thread的概念集合，其中的方法也是正对于这个集合的一些操作，比如添加线程，移除线程，标记
+未启动的线程，启动的线程，计算出存活的线程等等;具有上下层级，是一颗树状的结构
+
+
+2.主要方法
+(1).enumerate(Thread list[]) 列出存活线程集合
+(2).interrupt() 批量操作线程中断
+(3).add(Thread t) 将线程加入线程集合中
+
+3.属性
+(1).int maxPriority
+线程最高的优先级,最高的优先级不能大于parent的优先级.
+该Group中的线程的最高优先级都不能大于此优先级
+(2).int nUnstartedThreads
+该Group中未被启动的线程，当Thread被new的时候，就为未被启动的
+(3).int nthreads;
+线程数目,指的是被启动过的
+(4)Thread threads[];
+被启动的线程，
+(5)int ngroups;
+子ThreadGroup的数目
+(6)ThreadGroup groups[];
+子ThreadGroup的集合
+
+
+
+
+
