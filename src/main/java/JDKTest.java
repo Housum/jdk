@@ -193,9 +193,34 @@ public class JDKTest<K extends Object & Map, V> {
 
 //        testFillInStackTrace();
 
+        testRepeatableAnnotation();
 
     }
 
+
+
+    public static void testRepeatableAnnotation(){
+
+        RepeatAnnotationUseNewVersion annotationUseNewVersion = new RepeatAnnotationUseNewVersion();
+        Annotation[] annotations = annotationUseNewVersion.getClass().getDeclaredAnnotationsByType(Authorities.class);
+        for (Annotation annotation:annotations){
+            log(annotation);
+        }
+    }
+
+    @Repeatable(Authorities.class)
+    public @interface Authority {
+        String role();
+    }
+    public @interface Authorities {
+        Authority[] value();
+    }
+
+    @Authority(role="Admin")
+    @Authority(role="Manager")
+    public static class RepeatAnnotationUseNewVersion {
+        public void doSomeThing(){ }
+    }
 
     private static void testFillInStackTrace() throws Throwable{
 
