@@ -1,0 +1,45 @@
+Class解读
+
+1.class代表了java应用中的类或者是接口，比如枚举是一种类，注解也是类,基本类型
+也是一种，即使void也是。class中包含的大部分信息都是class字节码中包含的东西
+class字节码构造：
+magic
+major_version
+minor_version
+constant_pool_count
+constant_pool
+access_flag
+this_class
+super_class
+interface_count
+interface
+field_count
+field
+method_count
+method
+attribute_count
+attribute
+
+2.class中的信息
+(1).类中包含了它的元数据例如：字段，构造函数，注解，内部类，接口；
+相关判断的条件比如是否是原始类,是否是接口,是否是枚举等等,是否包含某个字段；
+还有获得元数据的相关方法，比如：获得类的字段，方法，构造函数，注解等等
+(2).
+
+3.类加载的相关东西
+(1).类加载过程 => 加载 验证 准备 解析 初始化 使用 卸载
+(2).类加载准守双亲委派原则：先父加载器进行加载（一直到bootstrap class loader）,如果父加载
+不了,那么子类进行加载。 详情请见 《ClassLoader解读》
+
+
+4.比如重要的方法
+(1).forName(..) 加载类，即3中提到的，如果类已经加载过了，那么直接返回。注意 这个逻辑是native的
+(2).getClassLoader(..)  获取加载改类的类加载器
+(3).isXXX XXX 判断元数据的信息2中提到的
+
+
+
+
+
+
+

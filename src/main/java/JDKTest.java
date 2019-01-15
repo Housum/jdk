@@ -1,5 +1,7 @@
+import sun.misc.Lock;
 import sun.misc.Unsafe;
 import sun.misc.VM;
+import sun.reflect.ConstantPool;
 
 import java.io.*;
 import java.lang.annotation.*;
@@ -8,6 +10,8 @@ import java.lang.ref.Reference;
 import java.lang.ref.ReferenceQueue;
 import java.lang.reflect.*;
 import java.net.URL;
+import java.security.AccessController;
+import java.security.PrivilegedAction;
 import java.security.ProtectionDomain;
 import java.text.SimpleDateFormat;
 import java.util.*;
@@ -18,7 +22,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  * @author luqibao
  * @date 2017/10/25
  */
-public class JDKTest<K extends Object & Map, V> {
+public class JDKTest<K extends Object & Map, V> implements Serializable {
 
     private static Garbage WEAK_HOLDER;
     private static byte[] bytes;
@@ -193,17 +197,38 @@ public class JDKTest<K extends Object & Map, V> {
 
 //        testFillInStackTrace();
 
-        testRepeatableAnnotation();
+//        testRepeatableAnnotation();
 
+
+//        testClass_native_getConstantPool();
+//        test_class_getAnnotatedInterfaces();
+
+//        testClassLoader();
+
+
+//        test_class_package();
+
+//        test_classLoader_getResource();
+
+//        test_compiler();
+
+//        test_System_setIO_setOut();
+
+//        test_System_setIO_setIn();
+
+//        test_System_property();
+
+//        test_system_separator();
+
+        test_package_version();
     }
 
 
-
-    public static void testRepeatableAnnotation(){
+    public static void testRepeatableAnnotation() {
 
         RepeatAnnotationUseNewVersion annotationUseNewVersion = new RepeatAnnotationUseNewVersion();
         Annotation[] annotations = annotationUseNewVersion.getClass().getDeclaredAnnotationsByType(Authorities.class);
-        for (Annotation annotation:annotations){
+        for (Annotation annotation : annotations) {
             log(annotation);
         }
     }
@@ -212,23 +237,25 @@ public class JDKTest<K extends Object & Map, V> {
     public @interface Authority {
         String role();
     }
+
     public @interface Authorities {
         Authority[] value();
     }
 
-    @Authority(role="Admin")
-    @Authority(role="Manager")
+    @Authority(role = "Admin")
+    @Authority(role = "Manager")
     public static class RepeatAnnotationUseNewVersion {
-        public void doSomeThing(){ }
+        public void doSomeThing() {
+        }
     }
 
-    private static void testFillInStackTrace() throws Throwable{
+    private static void testFillInStackTrace() throws Throwable {
 
         Throwable throwable = new Throwable("th");
         helpTestFillInStackTrace(throwable);
     }
 
-    private static void helpTestFillInStackTrace(Throwable throwable) throws Throwable{
+    private static void helpTestFillInStackTrace(Throwable throwable) throws Throwable {
         //1.如果没有注释
         /*
          *Exception in thread "main" java.lang.Throwable: th
@@ -246,7 +273,7 @@ public class JDKTest<K extends Object & Map, V> {
         throw throwable;
     }
 
-    private static void testThrowableSuppressed() throws Exception{
+    private static void testThrowableSuppressed() throws Exception {
         /*
         * Exception in thread "main" java.lang.RuntimeException: run1
 	at JDKTest.testThrowableSuppressed(JDKTest.java:199)
@@ -882,6 +909,111 @@ public class JDKTest<K extends Object & Map, V> {
     }
 
     public void method4(Class<? extends Float> clazz) {
+
+    }
+
+
+    public static void test_System_setIO_setOut() throws Exception {
+        PrintStream fileOutputStream = new PrintStream(new File("standard_out"));
+        System.setOut(fileOutputStream);
+        System.out.println("==standard_out==");
+
+    }
+
+    public static void test_System_setIO_setIn() throws Exception {
+        FileInputStream inputStream = new FileInputStream(new File("standard_out"));
+        System.setIn(inputStream);
+
+        int byteRead;
+        byte[] bytes = new byte[1024];
+        while ((byteRead = System.in.read(bytes)) !=-1){
+            System.out.println(new String(bytes,0,byteRead));
+        }
+
+    }
+
+    public static void test_System_property(){
+        log(System.getProperty("java.vendor.url"));
+    }
+
+    public static void test_system_separator(){
+        log("line separator|"+System.lineSeparator()+"|");
+    }
+
+
+    public static void test_package_version(){
+
+        /*
+        * output:
+        * =================================
+        * 1.8.0_171=1.8
+        * */
+        log(Package.getPackage("java.lang").getImplementationVersion() +"="
+        + Package.getPackage("java.lang").getSpecificationVersion());
+    }
+
+    public static void test_compiler() {
+
+        log(System.getProperty("java.compiler"));
+    }
+
+    public static void testClass_native_getConstantPool() throws Exception {
+
+        Class clazz = JDKTest.class;
+        Method method = Class.class.getDeclaredMethod("getConstantPool");
+        method.setAccessible(true);
+
+        ConstantPool constantPool = (ConstantPool) method.invoke(clazz);
+        log(constantPool.getSize());
+    }
+
+    public static void test_class_getAnnotatedInterfaces() {
+        AnnotatedType[] annotatedTypes = JDKTest.class.getAnnotatedInterfaces();
+        for (AnnotatedType annotatedType : annotatedTypes) {
+            log(annotatedType.getType().getTypeName());
+        }
+
+        /*
+         *print:
+         * =================================
+         * java.io.Serializable
+         */
+
+    }
+
+
+    public static void test_classloader_protected_domain() {
+
+        System.setSecurityManager(new SecurityManager());
+        AccessController.checkPermission(new PropertyPermission("/Users/qibao/file1", "w"));
+
+
+    }
+
+    public static void testClassLoader() {
+
+        /*这两个方法拿到的classLoader 是同一个*/
+        InputStream inputStream = JDKTest.class.getClassLoader().getResourceAsStream("doc/Error解读");
+        System.out.println(inputStream == null);
+
+        InputStream inputStream1 = JDKTest.class.getResourceAsStream("doc/Error解读");
+        System.out.println(inputStream1 == null);
+    }
+
+    public static void test_classLoader_getResource() {
+
+        URL url = JDKTest.class.getClassLoader().getResource("/Users/qibao/wx");
+        log(url == null);
+
+        URL url1 = JDKTest.class.getClassLoader().getResource("doc/Class解读");
+        log(url1 == null);
+
+    }
+
+    public static void test_class_package() {
+
+        Package packageZ = String.class.getPackage();
+        log(packageZ.getName());
 
     }
 

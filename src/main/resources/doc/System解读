@@ -1,0 +1,30 @@
+System解读
+
+1.提供了一些使用频率比较高的字段以及方法，比如标准输入和输出
+以及数组拷贝的方法,其中的大部分方法都是native的
+
+2. 主要的字段
+(1).public final static PrintStream out 标准输出,可以通过
+这个方法将数据进行输出到指定的地方(默认是控制台,也可以通过setIO进行
+设置输出的地点)
+
+(2). public final static InputStream in 标准输入(默认是控制台输入),
+如果设置的不是控制台的输入的话,那么要求传入的输入必须是打开的,可读的
+@see JDKTest.test_System_setIO_setIn
+
+(3).public final static PrintStream err 标准输出, out的不同点是在于
+它语义上的不同,它输出的内容表示的是错误,是需要注意的
+
+(4).private static volatile Console cons 控制台对象,如果JAVA应用是通过
+命令行启动的,并且没有关闭,那么就存在一个唯一的对象。如果是没有控制台的启动，比如
+定时任务等等,那么就不存在该对象,为null
+
+3.主要的方法
+(1).public static native void arraycopy(..)拷贝数组
+
+(2).public static String getProperty(String key) 获取系统的属性
+比如: java.version等等，详情 @see java.lang.System.getProperties
+
+(3).public static String lineSeparator() 返回平台相关的分隔符号
+
+(4).public static native long currentTimeMillis 返回系统当前的毫秒

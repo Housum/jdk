@@ -3,7 +3,8 @@ Reference 类主要的作用
 2.Reference的具体子类都是给VM调用的。具体的说法就是如果是WeakReference的话，那么就是弱引用：
 当对象不可达的时候,那么对象将会被回收;如果StrongReference的话,那么当堆内存不够使用的时候那么
 对这部分对象进行回收；如果是PhantomReference的话,那么下一次GC的时候将会被回收（其实它并不能被使用，只能
-作为一个GC回收的标记）；
+作为一个GC回收的标记）；FinalReference 不对外使用,package default的.
+
 3.对于Reference GC是特殊处理，就是说回收之后的对象都会放入Queue中（如果构造参数传入了的话）
 4.Reference源码分析：
 （1）
@@ -12,9 +13,16 @@ Active -> Pending -> Queue -> InActive
        -> InActive
 状态：
 Active 当Reference对象被创建的时候为这个状态，如果对象被要被回收的话，那么状态变为 InActive或者Pending
+同时这个对象也会被链接到pending-Reference list中(即类变量pending链表中)
+
 Pending 当对象要被回收的时候，如果创建的时候有传入ReferenceQueue的时候，那么先到这个状态等待放入到ReferenceQueue中
-Queue 对象被放入到ReferenceQueue中
+对象在类变量pending链表中
+
+Queue 处于ReferenceQueue中,从类变量pending链表中移到Queue
+
 InActive 当被ReferenceQueue移除，或者回收（取决与是否传入ReferenceQueue）
+
+
 （2）
 Reference的属性
 T referent ：对象
@@ -26,10 +34,16 @@ next ：
  *    Inactive:   this 当被ReferenceQueue移除的话，那么变为这个状态
  */
 discovered:
-（1）直接被VM使用，主要的作用是VM能过直接获取到这部分数据可以直接用来被GC处理
+（1）直接被VM使用，主要的作用是VM能过直接获取到这部分数据从而维护这部分数据(检查是否可达等状态)
 （2）在pending的情况下，存放的是下一个被放入Queue的元素
+
+Reference的类变量
+pending: Reference 通过discovered链接的链表, pending是当前要处理的对象(当有注册Queue的时候)
+discovered则是下一个被处理的对象
+
+
 5.生命周期
-(1)Reference被创建 -> discovered暴露被VM,GC发现对象可以被回收 -> 刚入到pending队列中 -> 被后台线程放入到 queue中 -> 被移除 -> 回收
+(1)Reference被创建 -> discovered暴露被VM,GC发现对象可以被回收 -> 刚入到pending队列中 -> 被后台线程（Reference Handler)放入到 queue中 -> 被移除 -> 回收
 (2)Reference被创建 -> discovered暴露被VM,GC发现对象可以被回收 -> 回收
 
 6.Finalizer 特殊类型的Reference

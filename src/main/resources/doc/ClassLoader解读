@@ -1,0 +1,61 @@
+ClassLoader解读
+
+1.类加载 对类进行加载，主要就是将字节码流加载成Class
+
+双亲委派机制：
+除了启动类加载器(bootstrap class loader)，其他的类加载器都有一个父加载器，双亲委派机制
+讲的就是当加载一个类的时候先通过父加载器进行加载，如果加载失败的话,那么再通过子类进行加载，
+最后如果没有找到类的话,那么抛出class not find异常
+
+类加载的过程：
+加载 - > 验证 -> 准备 -> 解析 -> 初始化 -> 使用 -> 卸载
+       |____________________|
+                |
+               链接
+
+(1).加载:加载类的字节码,这部分可以通过自定义的方式,从文件系统或者其他的方式获取字节流
+(2).验证:对类的字节码进行验证 具体的字节码构成请参考《Class解读》
+(3).准备:对类变量和类常量进行初始化
+(4).解析:因为对于字节码中的字段方法等等都是符号引用，而不是直接引用，这部分需要将符号引用
+转换成直接引用
+(5).初始化:这部分开始就是JAVA代码中我们对字段赋值了,对构造函数的调用了
+(6).使用:JAVA中使用的过程
+(7).卸载:类处于方法区,一般认为方法区的都不会被卸载,其实只是卸载条件比较苛刻,但是只要满足
+条件依然可以被卸载
+(8).链接: 这一部分是将类进行解析，而在ClassLoader中也有这个参数指定是否链接（默认是不链接，只有到
+使用到Class的时候才会被链接,构造函数中loadClass(String name, boolean resolve) resolve指定是否
+链接
+
+2.主要字段
+(1).ClassLoader parent 父类加载器
+(2).ConcurrentHashMap<String, Object> parallelLockMap 类加载器默认是采用的并发的方式对类
+进行加载(子类选择是否是并发方式加载器),key存放的是类名,值存放的是对象锁
+(3). Vector<Class<?>> classe 存放的都是被当前的类加载加载的类
+(4).private final HashMap<String, Package> packages 存放的是该类加载器加载的类的
+包对象,具体Package详情请见《Package解读》
+
+
+3.主要的方法
+(1).模版方法 findClass(String name)  子类需要覆盖，实现根据名称获取class的方法
+(2).defineClass(String name, byte[] b, int off, int len) 将字节码流转换成class，一般
+在子类中继承的方法获得的字节码流都会通过这个方法获取Class
+(3).getResource(String name) 获取资源，这个资源指的是类路径中的
+(4).protected static boolean registerAsParallelCapable() 注册为类并发加载,虽然ClassLoader已经
+注册为并发加载了,但是如果子类是并发加载的话,那么依然需要调用此方法进行注册。如果类加载器不是严格的层级
+关系,非并发加载可能导致死锁(因为classLoader中loadClass方法进行了加锁操作)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
