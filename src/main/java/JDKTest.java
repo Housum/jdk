@@ -1,6 +1,4 @@
-import sun.misc.Lock;
 import sun.misc.Unsafe;
-import sun.misc.VM;
 import sun.reflect.ConstantPool;
 
 import java.io.*;
@@ -11,7 +9,6 @@ import java.lang.ref.ReferenceQueue;
 import java.lang.reflect.*;
 import java.net.URL;
 import java.security.AccessController;
-import java.security.PrivilegedAction;
 import java.security.ProtectionDomain;
 import java.text.SimpleDateFormat;
 import java.util.*;
@@ -993,10 +990,10 @@ public class JDKTest<K extends Object & Map, V> implements Serializable {
     public static void testClassLoader() {
 
         /*这两个方法拿到的classLoader 是同一个*/
-        InputStream inputStream = JDKTest.class.getClassLoader().getResourceAsStream("doc/Error解读");
+        InputStream inputStream = JDKTest.class.getClassLoader().getResourceAsStream("doc/basic/Error解读");
         System.out.println(inputStream == null);
 
-        InputStream inputStream1 = JDKTest.class.getResourceAsStream("doc/Error解读");
+        InputStream inputStream1 = JDKTest.class.getResourceAsStream("doc/basic/Error解读");
         System.out.println(inputStream1 == null);
     }
 
@@ -1005,7 +1002,7 @@ public class JDKTest<K extends Object & Map, V> implements Serializable {
         URL url = JDKTest.class.getClassLoader().getResource("/Users/qibao/wx");
         log(url == null);
 
-        URL url1 = JDKTest.class.getClassLoader().getResource("doc/Class解读");
+        URL url1 = JDKTest.class.getClassLoader().getResource("doc/basic/Class解读");
         log(url1 == null);
 
     }
