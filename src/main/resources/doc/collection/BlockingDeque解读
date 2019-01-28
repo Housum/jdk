@@ -1,0 +1,24 @@
+BlockingDeque解读
+
+1.
+
+(1).BlockingDeque相对于Deque就如BlockingQueue于Queue,提供了堵塞支持的双端队列,同样的
+对于操作也是提供了四种方式结果：
+
+Summary of BlockingDeque methods
+First Element (Head)
+            Throws exception	Special value	Blocks	        Times out
+Insert	    addFirst(e)	        offerFirst(e)	putFirst(e)	    offerFirst(e, time, unit)
+Remove	    removeFirst()	    pollFirst()	    takeFirst()	    pollFirst(time, unit)
+Examine 	getFirst()	        peekFirst()
+
+Last Element (Tail)
+                Throws exception	Special value	Blocks	    Times out
+Insert	        addLast(e)	        offerLast(e)	putLast(e)	offerLast(e, time, unit)
+Remove	        removeLast()	    pollLast()	    takeLast()	pollLast(time, unit)
+Examine	        getLast()	        peekLast()
+
+(2).该类位于concurrent包中,为并发工具类
+
+
+

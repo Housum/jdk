@@ -1,0 +1,81 @@
+ArrayDeque解读
+
+1.使用数组实现的Deque(继承了Queue),实现了双端队列以及栈的功能.在性能上：栈对Stack性能更高
+在队列上面比LinkedList更高。ArrayDeque的实现方式是使用的环形数组的方式，所以内部使用的数组必须是
+2的倍数. 内部储存了head和tail的索引值,并且不是固定的,是移动的，比如新增一个元素e,那么arr[(tail+1)&length-1]=e
+
+
+2.方法
+(1).增：
+在上一次增加元素的时候,会计算一下存储的位置
+
+添加在头部
+public void addFirst(E e) {
+    if (e == null)
+        throw new NullPointerException();
+    //插入在首位的时候,计算首位的位置.通过并的方式形成环
+    elements[head = (head - 1) & (elements.length - 1)] = e;
+    if (head == tail)
+        //为了下一次有容量储存,所以扩容
+        doubleCapacity();
+}
+添加在尾部
+public void addLast(E e) {
+    if (e == null)
+        throw new NullPointerException();
+    //tail是上一次计算出来的
+    elements[tail] = e;
+    //计算下一次的位置
+    if ( (tail = (tail + 1) & (elements.length - 1)) == head)
+        //为了下一次有储存空间,进行扩容
+        doubleCapacity();
+}
+(2).删
+同理也是通过并的方式获取到首位后面的那么元素作为首位
+删首部
+public E pollFirst() {
+    int h = head;
+    @SuppressWarnings("unchecked")
+    E result = (E) elements[h];
+    // Element is null if deque empty
+    if (result == null)
+        return null;
+    elements[h] = null;     // Must null out slot
+    head = (h + 1) & (elements.length - 1);
+    return result;
+}
+删尾部
+public E pollLast() {
+    int t = (tail - 1) & (elements.length - 1);
+    @SuppressWarnings("unchecked")
+    E result = (E) elements[t];
+    if (result == null)
+        return null;
+    elements[t] = null;
+    tail = t;
+    return result;
+}
+(3)查 同理
+头部
+public E pollFirst() {
+    int h = head;
+    @SuppressWarnings("unchecked")
+    E result = (E) elements[h];
+    // Element is null if deque empty
+    if (result == null)
+        return null;
+    elements[h] = null;     // Must null out slot
+    head = (h + 1) & (elements.length - 1);
+    return result;
+}
+尾部
+public E pollLast() {
+    int t = (tail - 1) & (elements.length - 1);
+    @SuppressWarnings("unchecked")
+    E result = (E) elements[t];
+    if (result == null)
+        return null;
+    elements[t] = null;
+    tail = t;
+    return result;
+}

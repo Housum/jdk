@@ -1,0 +1,19 @@
+SortedSet解读
+
+1.继承Set,提供了排序功能 有两种排序的方式,第一种是采用了Comparable接口(元素必须实现这个接口)的排序方式,另外一种的方式就是
+使用提供的Comparator(元素必须能够使用比较器进行比较)进行排序的方式。因为是有序的Set,所以提供了相关的方法.比如返回最大的值, 最小的值,
+返回某个部分的集合
+
+2.方法
+(1).Comparator<? super E> comparator() 如果存在的话,那么返回这个作用于集合的比较器,如果不存在的话,那么进行返回
+(2).SortedSet<E> subSet(E fromElement, E toElement) 返回一个子集,这个子集依赖主集合,对于两个集合的修改都是相互
+影响,包含fromElement,不包含toElement
+(3).SortedSet<E> headSet(E toElement) 返回小于指定元素的集合的首部,不包含toElement
+(4).SortedSet<E> tailSet(E fromElement) 返回大于等于指定原书的尾部,包含fromElement
+(5).E first() 返回最小的那个元素
+(6).E last() 返回最大的那个元素
+
+3.记忆的方式
+相对于Set来说,增加了排序的功能. 所以增加这方面的一些功能,具体参考上面的方法
+
+

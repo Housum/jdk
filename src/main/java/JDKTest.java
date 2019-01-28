@@ -217,10 +217,21 @@ public class JDKTest<K extends Object & Map, V> implements Serializable {
 
 //        test_system_separator();
 
-        test_package_version();
+//        test_package_version();
+
+        testDeque();
     }
 
 
+
+    public static void testDeque(){
+        Deque<Integer> deque = new ArrayDeque<>();
+        deque.push(1);
+        deque.push(2);
+
+        log(deque.pop());
+        log(deque.pop());
+    }
     public static void testRepeatableAnnotation() {
 
         RepeatAnnotationUseNewVersion annotationUseNewVersion = new RepeatAnnotationUseNewVersion();

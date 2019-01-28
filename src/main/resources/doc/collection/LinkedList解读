@@ -1,0 +1,88 @@
+LinkedList解读
+
+1.通过链表实现的列表(双向链表),和ArrayList不同的是LinkedList实现了多个接口: Deque(继承Queue)
+链表的优点是随机插入,插入的性能为o(1). 但是对于读取某一个元素的话,可能需要进行遍历，复杂度为
+o(n)
+
+2.方法
+
+(1).增
+通过链式方法新增元素，比如：
+void linkLast(E e) {
+    final Node<E> l = last;
+    final Node<E> newNode = new Node<>(l, e, null);
+    last = newNode;
+    if (l == null)
+        first = newNode;
+    else
+        l.next = newNode;
+    size++;
+    modCount++;
+}
+将元素添加到了链表的最后,其他的新增也是差不多,可能是新增到最前面,或者指定的索引的后面
+
+(2).删
+通过链表的方式移除元素,比如
+E unlink(Node<E> x) {
+    // assert x != null;
+    final E element = x.item;
+    final Node<E> next = x.next;
+    final Node<E> prev = x.prev;
+
+    if (prev == null) {
+        first = next;
+    } else {
+        prev.next = next;
+        x.prev = null;
+    }
+
+    if (next == null) {
+        last = prev;
+    } else {
+        next.prev = prev;
+        x.next = null;
+    }
+
+    x.item = null;
+    size--;
+    modCount++;
+    return element;
+}
+其他的移除也差不多
+
+(3)查
+通过链表方式查询
+Node<E> node(int index) {
+    // assert isElementIndex(index);
+
+    if (index < (size >> 1)) {
+        Node<E> x = first;
+        for (int i = 0; i < index; i++)
+            x = x.next;
+        return x;
+    } else {
+        Node<E> x = last;
+        for (int i = size - 1; i > index; i--)
+            x = x.prev;
+        return x;
+    }
+}
+通过链式的方式一直查询,知道查询到指定的元素，否则没有查询到的话,那么返回null
+
+(4) push&pop
+push使用的是addFirst
+pop使用的是removeFirst
+
+
+3.内部类
+Node LinkedList的元素,是一个双端关联的元素
+
+
+
+
+
+
+
+
+
+

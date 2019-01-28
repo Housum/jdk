@@ -1,0 +1,20 @@
+TransferQueue解读
+
+1.继承BlockingQueue,具有堵塞队列的特性.除此之外，还提供了其他的功能：提供了方法:当生产一个元素的
+时候一直堵塞等到元素被消费者给消费. 但是对于继承于BlockingQueue的方法是没有这个特性的.只有transfer()
+方法会一直等待消费者对生产的元素进行消费,tryTransfer(..)如果有消费者消费的话,直接被消费,如果没有的话
+那么直接返回,生产的元素也被丢弃.
+
+2.方法
+(1).tryTransfer(E)
+如果已经有一个消费者已经在等待了(通过take,poll(timeout)),那么生产的对象被消费掉,否则的话,元素并不会入队列
+方法是非堵塞的.
+(2).tryTransfer(E,timeout,unit)
+如果已经有一个消费者已经在等待了(通过take,poll(timeout)),那么生产的对象被消费掉,否则的话,等待timeout的时间,
+如果还是没有消费者进行消费,那么元素不会入队列.方法返回false
+(3).transfer(E)
+无限堵塞,知道有消费者进行消费.或者被中断
+(4).hasWaitingConsumer
+判断是否有消费者在等待中(take,poll(timeout)),因为是多线程环境下的,所以这个返回结果不是十分的准确
+(5).getWaitingConsumerCount
+获取等待的消费者在等待中的数量(take,poll(timeout)),因为是多线程环境下的,所以这个返回结果不是十分的准确

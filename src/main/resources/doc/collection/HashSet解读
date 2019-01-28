@@ -1,0 +1,9 @@
+HashSet解读
+
+1.使用hash算法实现的Set,内部其实储存的是HashMap,key为储存的值,value为一个常量：
+private transient HashMap<E,Object> map,
+public boolean add(E e) {
+    return map.put(e, PRESENT)==null;
+}
+所以所有的操作其实都是针对于HashMap进行的
+

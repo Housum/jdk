@@ -1,0 +1,26 @@
+NavigableSet解读
+
+1.emmm,继承于SortedSet.这个该怎么翻译呢,可供导航的集合,提供一些搜索的方法,比如返回集合中大于某个对象的值
+返回大于等于某个对象(对象类型需要和集合中的类型相同)的值,返回小于,小于等于某个对象的值,或者返回正序或者倒序的集合。
+该集合的设计的方法覆盖非常的丰富
+
+2.方法
+因为是导航类的集合,所以其中大部分还是查询的方法.
+针对于单个集合中单个元素的：
+(1).E lower(E e) 返回集合中小于e但是最接近e的元素
+(2).E floor(E e) 返回集合中小于或者等于e但最接近e的元素
+(3).E ceiling(E e) 返回集合中大小等于e但是最接近e的元素
+(4).E higher(E e) 返回集合中大小e但最接近e的元素
+(5).E pollFirst() 将集合中元素最小的返回
+(6).E pollLast()  将集合中最大的元素返回
+
+针对于子集合的
+(1).NavigableSet<E> descendingSet() 返回倒序的集合
+(2).NavigableSet<E> subSet(E fromElement, boolean fromInclusive,E toElement,boolean toInclusive)
+返回子列表,和SortedSet不同点在于可以指定是否包含临界值
+(3).NavigableSet<E> headSet(E toElement, boolean inclusive) 和SortedSet类似,不同点在于可以指定是否包含
+临界值
+(4).NavigableSet<E> tailSet(E fromElement, boolean inclusive)和SortedSet类似,不同点在于可以指定是否包含
+临界值
+
+

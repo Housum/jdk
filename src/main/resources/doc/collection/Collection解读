@@ -1,0 +1,31 @@
+Collection解读
+
+1.所有集合的基类. 包含了集合的增,删,改,查询等行为
+
+2.方法
+(1).增:
+add(E)
+addAll(Collection<E>)
+
+(2).删除
+clear
+remove(E)
+removeAll(Collection<E>)
+
+(3).改
+retainAll(Collection<E>)
+
+
+(4)查询
+contain
+containAll
+isEmpty
+size
+toArray(Object[] arr)
+toArray(T[] arr)
+iterator
+
+
+3.因为集合方法比较多,记住的时候可以根据增删改查的方法来记录
+
+

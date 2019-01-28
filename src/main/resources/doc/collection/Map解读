@@ -1,0 +1,48 @@
+Map解读
+
+1.map就是将键和值进行映射的这么一个工具,每个key能够映射一个值. map不能保存重复的键,
+一个键也只能映射一个值。这是一个最高的基类,不同的自接口或者子类可以定义自己的语义.Map也是
+容器的一种。
+
+2.方法:
+因为是一种容器,所以可以堪称是容器的增删改查
+
+(1).增
+V put(K key, V value) 将key和值关联上. 如果key已经关联上了一个值,那么会被替换
+并且将旧的值返回
+
+void putAll(Map<? extends K, ? extends V> m) 将其他map的数据批量插入到map中
+
+default V putIfAbsent(K key, V value) 如果key不存在关联的值,那么进行设置
+
+(2).删
+V remove(Object key) 删除关联键的值
+
+default boolean remove(Object key, Object value) 当map中存在这个key并且key对应了
+对应的value, 那么进行删除
+
+(3).改
+default V compute(K key,BiFunction<? super K, ? super V, ? extends V> remappingFunction)
+对给定的键和值进行计算,如果返回的新值为null,那么删除该键值对
+BiFunction: R apply(T t, U u)
+
+V computeIfAbsent(K key,Function<? super K, ? extends V> mappingFunction)
+如果给定的键在map中存在的话,进行计算,如果计算结果不为null的话,那么将键值对进行设置到map中去,并且将新
+值返回
+
+default V computeIfPresent(K key, BiFunction<? super K, ? super V, ? extends V> remappingFunction)
+于前面的相反,如果存在键对应的值的话,那么进行计算,并且进行替换
+
+default V merge(K key, V value,BiFunction<? super V, ? super V, ? extends V> remappingFunction)
+如果没有关键的键值对,那么将键值对进行设置. 如果存在的话,那是使用func计算的新值进行替换.
+
+default V replace(K key, V value) 如果键存在于map中,那么进行替换
+
+default boolean replace(K key, V oldValue, V newValue) 如果存在,并且旧值等于预期的,那么进行替换
+
+
+(4).查
+返回所有的key,否则value,查询键对应的值,返回Entry等
+
+
+

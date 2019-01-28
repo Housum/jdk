@@ -1,0 +1,17 @@
+TreeSet解读
+
+1.实现了接口NavigableSet,所以提供了可供导航的能力.内部实现是使用了NavigableMap,当没有传入
+参数的时候,默认是TreeMap. key放的是TreeSet的值,value放的是常量
+
+private transient NavigableMap<E,Object> m;
+private static final Object PRESENT = new Object();
+TreeSet(NavigableMap<E,Object> m) {
+    this.m = m;
+}
+public TreeSet() {
+    this(new TreeMap<E,Object>());
+}
+
+
+
+

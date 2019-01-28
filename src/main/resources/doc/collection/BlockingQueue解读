@@ -1,0 +1,26 @@
+BlockingQueue 解读
+https://docs.oracle.com/javase/8/docs/api/java/util/concurrent/BlockingDeque.html
+
+1.
+(1).继承Queue,即实现了队列的功能, 该接口的功能从名称可以看出来,主要的是支持堵塞
+功能的队列. 如果没有空间插入的话,那么插入操作可能一直堵塞,或者堵塞指定的时间.
+队列中不允许插入null,否则将抛出NPE
+
+(2).对于BlockingQueue的操作,有四种结果,如果操作失败:抛出异常;返回指定的对象;将
+线程堵塞;将线程堵塞一定的时间.
+Summary of BlockingQueue methods
+                    Throws exception	Special value	Blocks	            Times out
+Insert	            add(e)	            offer(e)	    put(e)	            offer(e, time, unit)
+Remove	            remove()	        poll()	        take()	            poll(time, unit)
+Examine	            element()	        peek()
+
+(3).该类是在concurrent包中定义的类,所以属于并发库中的接口
+
+2.
+除了1.(2)中的方法
+(1).int remainingCapacity() 返回队列中的容量还有多少,因为是在多线程中使用,所以
+这个值并不是十分的准确
+(2).int drainTo(Collection<? super E> c) 将队列中的元素移到集合中
+(3).int drainTo(Collection<? super E> c, int maxElements) 将集合中的maxElements
+个元素移到集合中
+

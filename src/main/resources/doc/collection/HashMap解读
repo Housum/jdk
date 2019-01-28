@@ -1,0 +1,85 @@
+HashMap 解读
+
+目录：
+1.概述1
+2.概述2
+3.方法
+4.数据结构(字段构成)
+
+
+1.使用hash实现的map,非线程安全,hashmap的特有的一些特性:当hashmap 大于threshold的时候
+将会进行扩容,threshold = capacity*loadFactor,capacity以及loadFactor在初始化的时候可以
+设置,loadFactor就是实际元素储所占有空间的比例
+
+2.hashMap中最重要的两个数据结构： hash表以及红黑树(当hashmap中某个hash冲突超过8个,并且map中
+元素超过64的时候,同一个hash链进化为为红黑树从o(n) 到 lgN 的区别).
+
+两个算法数据结构:
+hash算法： (k.hash >> 16 ^ k.hash) | (n-1) n为table的大小
+红黑二叉查找树 可以参看《算法》
+
+
+3.主要的几个方法的实现原理:
+(1). static final int hash(Object key)
+取给定键的hash值,实现方式是(k.hash >> 16 ^ k.hash),将hash低16与高16进行异或,这样做的目的
+是使hash的分布更加的散开. 因为大部分的float的key的范围hash值在一个很小的范围
+
+(2).final V putVal(int hash, K key, V value, boolean onlyIfAbsent,boolean evict)
+将key和value插入到map中,主要几个步骤：
+    1.如果是初始插入元素,需要将内部的table[] 进行初始化(将就调用到resize()方法)
+    2.如果不是初始,那么3种情况：
+        1.如果没有hash冲突,直接将值存储与hash&(n-1)位置
+        2.如果hash冲突,那么有2种情况：
+            1.hash冲突已经从链表进化为红黑树了,将新值插入到树中,具体参看《算法》
+            2.hash冲突了,有2种情况:
+                1.链表,并且不需要进行进化为红黑树(进化条件：单个hash冲突超过8个,map中的值超过64为元素)
+                2.链表,达到了进化的条件,将链表进化为红黑树
+        3.如果该key已经存在了,那么进行替换
+    3.判断实际table[]实际大小是否已经超过了threshold,如果大于那么进行扩容(将调用到resize()方法)
+
+(3).final Node<K,V>[] resize()
+对hashmap进行扩容
+    1.第一次执行初始化
+        1.未设置threshold
+            设置capacity = 1 << 4,新的threshold = capacity * loadFactor
+        2.设置了threshold
+            将capacity 设置为threshold,新的threshold = capacity * loadFactor
+    2.非第一次resize
+        1.如果capacity 大于 1 << 30
+            capacity设置为 1 << 30,threshold设置为Integer.MAX_VALUE,意味不再检查容量问题
+        2.如果没有超过最大值
+            将capacity以及threshold扩容到原来的两倍
+    3.将原来的table设置为table[capacity],将原有的数据拷贝到新的数组中
+        1.如果是原有table中的元素没有hash冲突的情况下,通过hash&(n-1)重新设置（n = 新的capacity）
+        2.如果是树节点,进行操作. 将树进行分割或者将数重新退化为链表
+        3.如果是链表,那么有2中情况:（oldCap = 原有数组的capacity）
+            1.如果是不是在原来的(e.hash & oldCap) == 0，即不是在首位的,那么在新的
+            数组中位置是不变的.
+            2.如果(e.hash & oldCap) == 1,那么在新的数组中向右移动oldCap位置
+
+(4).final Node<K,V> getNode(int hash, Object key)
+获取map中对于给定key的值,和插入相似,获取也大概分为几种情况:
+    1.如果给定的hash没有冲突,那么table[hash&(n-1)]即为需要查询的元素
+    2.如果给定的有冲突, 并且是一棵树的话,那么进行红黑树的查询
+    3.如果冲突,但是还是链表的话,那么进行链表的查询
+
+(5). final Node<K,V> removeNode(int hash, Object key, Object value, boolean matchValue, boolean movable)
+删除map中的元素
+    1.删除给定key的元素,如果是没有hash冲突的,直接将table[hash&(n-1)]设置为null.
+    2.如果是链表结构,那么删除链表中的元素
+    3.如果是树结构的话,那么将树结构中的元素删除
+
+4.hashmap的数据结构
+
+size / capacity <= loadFactor
+table[].length = capacity
+
+(1).int threshold
+hashmap,因为是通过hash表实现的,所以为了减少hash冲突(冲突将导致复杂度从o(1)到o(n)),所以通过空间换时间的方式
+将hash表设置比实际储存的元素个数大,那么就能够减少冲突. 而这个参数就是设置了实际储存的大小和总空间的大小的比例.
+是一个小于等于1的数,默认是0.75,是一个权衡过的数字
+(2).transient Node<K,V>[] table
+储存map中的元素,元素是Node. table的小于是capacity,实际储存是size
+(3).transient int size 真实的大小
+(4).transient int modCount 作为并发快速失败的计数器
+(5).final float loadFactor 加载因子,
