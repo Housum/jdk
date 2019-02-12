@@ -1,0 +1,11 @@
+ConcurrentHashMap解读
+
+1. 提供了并发能力的hashmap,对于所有的事务操作都具有原子性.JAVA7与JAVA8实现上有很大的不同点,7使用的是
+分段锁的方式，而8废弃了这种方式,采用的是大部分的操作都是使用的CAS+ volatile 的方式进行设置
+
+
+2. 具体分析参考：http://www.importnew.com/29832.html
+
+
+
+

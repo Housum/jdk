@@ -10,8 +10,10 @@ import java.lang.reflect.*;
 import java.net.URL;
 import java.security.AccessController;
 import java.security.ProtectionDomain;
+import java.text.Collator;
 import java.text.SimpleDateFormat;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -219,12 +221,65 @@ public class JDKTest<K extends Object & Map, V> implements Serializable {
 
 //        test_package_version();
 
-        testDeque();
+//        testDeque();
+
+//        testLinkedHashMap();
+
+        testConcurrentHashMap();
     }
 
 
+    private static int RESIZE_STAMP_BITS = 16;
 
-    public static void testDeque(){
+    public static void testConcurrentHashMap() {
+
+        log(Integer.toString(16, 2));
+        log(Integer.toString(Integer.numberOfLeadingZeros(16)));
+        log(Integer.toString(Integer.numberOfLeadingZeros(16), 2));
+        int i = Integer.numberOfLeadingZeros(16) | (1 << (RESIZE_STAMP_BITS - 1));
+        log(Integer.toString(i, 2));
+
+        //²¢ÐÐ¼ÆËã
+        ConcurrentHashMap<String, Integer> map = new ConcurrentHashMap<>();
+        String baseStr = "ABCDEF";
+        for (int j = 1; j < baseStr.length(); j++) {
+            map.put(String.valueOf(baseStr.charAt(j - 1)), j);
+        }
+        map.forEach(2, (k, v) -> System.out.println(Thread.currentThread().getName() + ",k = " + k + ",v  = " + v));
+
+        Integer v = map.search(4, (k, v1) -> {
+            if ("A".equals(k)) return v1;
+            return null;
+
+        });
+        System.out.println(v);
+
+        System.out.println("A".split(",").length);
+
+
+    }
+    public static void testLinkedHashMap() {
+
+        Map<String, Integer> integerMap = new LinkedHashMap<String, Integer>() {
+            @Override
+            protected boolean removeEldestEntry(Map.Entry eldest) {
+                return size() > 1;
+            }
+        };
+        /*
+         * =================================
+         * {1=1}
+         * =================================
+         * {2=2}
+         * */
+        integerMap.put("1", 1);
+        log(integerMap);
+        integerMap.put("2", 2);
+        log(integerMap);
+    }
+
+
+    public static void testDeque() {
         Deque<Integer> deque = new ArrayDeque<>();
         deque.push(1);
         deque.push(2);
@@ -232,6 +287,7 @@ public class JDKTest<K extends Object & Map, V> implements Serializable {
         log(deque.pop());
         log(deque.pop());
     }
+
     public static void testRepeatableAnnotation() {
 
         RepeatAnnotationUseNewVersion annotationUseNewVersion = new RepeatAnnotationUseNewVersion();
@@ -934,30 +990,30 @@ public class JDKTest<K extends Object & Map, V> implements Serializable {
 
         int byteRead;
         byte[] bytes = new byte[1024];
-        while ((byteRead = System.in.read(bytes)) !=-1){
-            System.out.println(new String(bytes,0,byteRead));
+        while ((byteRead = System.in.read(bytes)) != -1) {
+            System.out.println(new String(bytes, 0, byteRead));
         }
 
     }
 
-    public static void test_System_property(){
+    public static void test_System_property() {
         log(System.getProperty("java.vendor.url"));
     }
 
-    public static void test_system_separator(){
-        log("line separator|"+System.lineSeparator()+"|");
+    public static void test_system_separator() {
+        log("line separator|" + System.lineSeparator() + "|");
     }
 
 
-    public static void test_package_version(){
+    public static void test_package_version() {
 
         /*
-        * output:
-        * =================================
-        * 1.8.0_171=1.8
-        * */
-        log(Package.getPackage("java.lang").getImplementationVersion() +"="
-        + Package.getPackage("java.lang").getSpecificationVersion());
+         * output:
+         * =================================
+         * 1.8.0_171=1.8
+         * */
+        log(Package.getPackage("java.lang").getImplementationVersion() + "="
+                + Package.getPackage("java.lang").getSpecificationVersion());
     }
 
     public static void test_compiler() {

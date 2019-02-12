@@ -1,0 +1,17 @@
+LinkedHashMap 解读
+
+1. 继承HashMap,方法也和hashMap相同,并且都是基于hash实现的map,删除,插入,查询的性能
+为1
+
+2.和HashMap的不同点体现在Linked上面，除了hashmap维护的数据结构之外，还维护了一个双向
+链表,这个链表维护了插入的元素,在linkedhashmap中保存了链表的首尾节点.新插入的元素插入到最后的
+元素上. 对于它的遍历的性能就比hashmap好,因为hashmap将会遍历整一个数组，数组为capacity,而linkedHashMap
+则只需要遍历size和元素, 而size  = capacity * loadFactor.
+
+3.关键方法：
+    1.public LinkedHashMap(int initialCapacity,float loadFactor,boolean accessOrder)
+    构造函数,前面两个参数参考《HashMap解读》,最后一个参数的含义是定义了该类的运行模式,如果是true的话,
+    那么运行的模式当一个元素被操作的话(get*,put* 操作),那么该元素将会被移动到最后面. 如果为false,那么则不会,只会在插入的
+    时候,元素才会在最后.
+    2.removeEldestEntry(Map.Entry<K,V> eldest)  是否移除在链表中停留时间最长的元素(默认返回false),如果构造函数的accessOrder
+    为true,那么返回true的话，则可以实现为LRU。如果为false,那么可以实现为定长的HashMap

@@ -1,0 +1,6 @@
+LinkedHashSet解读
+
+1.参考《LinkedHashMap》,跟LinkedHashMap不同点在于,实现的是removeEldest 返回的是false,即
+不能作为LRU使用,只能作为HashSet以及具有更高的遍历性能
+
+

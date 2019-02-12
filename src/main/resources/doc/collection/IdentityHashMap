@@ -1,0 +1,11 @@
+IdentityHashMap解读
+
+1. 与其他的Map完全不一样,其他Map相等的判断条件是：k1==null?k2==null:k1.equal(k2)
+而IdentityHashMap的判断条件是k1 == k2 就是说要求map中键的引用相等才算是相等的键
+
+2.使用场景
+    1.保存多个引用:
+     @see java.lang.Throwable.printStackTrace(java.lang.Throwable.PrintStreamOrWriter)
+     @see java.lang.ApplicationShutdownHooks
+
+

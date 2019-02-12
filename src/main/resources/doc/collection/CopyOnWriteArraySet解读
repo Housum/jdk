@@ -1,0 +1,3 @@
+CopyOnWriteArraySet解读
+
+1.参考 CopyOnWriteArrayList, 实现方式是相同的,不同点在于满足Set的要求,不允许重复的元素
