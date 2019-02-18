@@ -238,7 +238,9 @@ public class JDKTest<K extends Object & Map, V> implements Serializable {
 
 //        testReentrantLockInterrupt();
 
-        testAQSCondition();
+//        testAQSCondition();
+
+        testPrintThreadPoolStatus();
     }
 
 
@@ -957,7 +959,29 @@ public class JDKTest<K extends Object & Map, V> implements Serializable {
         TimeUnit.SECONDS.sleep(2);
 
     }
+    private static final int COUNT_BITS = Integer.SIZE - 3;
+    private static final int CAPACITY   = (1 << COUNT_BITS) - 1;
+    private static final int RUNNING    = -1 << COUNT_BITS;
+    private static final int SHUTDOWN   =  0 << COUNT_BITS;
+    private static final int STOP       =  1 << COUNT_BITS;
+    private static final int TIDYING    =  2 << COUNT_BITS;
+    private static final int TERMINATED =  3 << COUNT_BITS;
 
+    public static void testPrintThreadPoolStatus(){
+        log(Integer.toString(CAPACITY,2));
+        log(Integer.toString(RUNNING,2));
+        log(Integer.toString(SHUTDOWN,2));
+        log(Integer.toString(STOP,2));
+        log(Integer.toString(TIDYING,2));
+        log(Integer.toString(TERMINATED,2));
+        log("runStateOf");
+        log(runStateOf(RUNNING));
+
+
+
+    }
+
+    private static int runStateOf(int c)     { return c & ~CAPACITY; }
 
     public static void testFinalize() throws Exception {
         FinalizeClass finalizeClass = new FinalizeClass();

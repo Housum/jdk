@@ -1,0 +1,186 @@
+FutureTask解读
+1.概述
+2.状态即
+3.方法分析
+
+1.异步计算的任务,实现了Future和Runnable,非常的典型所以拿出来分析一下,其中的机制其实和
+AQS的大同小异
+
+2.状态机：
+* Possible state transitions:
+ * NEW -> COMPLETING -> NORMAL
+ * NEW -> COMPLETING -> EXCEPTIONAL
+ * NEW -> CANCELLED
+ * NEW -> INTERRUPTING -> INTERRUPTED
+ */
+private volatile int state;
+private static final int NEW          = 0;//新建
+private static final int COMPLETING   = 1;//计算中
+private static final int NORMAL       = 2;//计算完成
+private static final int EXCEPTIONAL  = 3;//出现异常
+private static final int CANCELLED    = 4;//被取消
+private static final int INTERRUPTING = 5;//被中断中
+private static final int INTERRUPTED  = 6;//全部中断
+
+3.方法分析
+(1).执行逻辑运算(从Runnable中继承)
+public void run() {
+    //1.必须是第一次启动的|| 其他线程已经启动了
+     2.采用CAS的方式设置当前线程为启动线程 如果失败的话那么说明被并发执行了
+    if (state != NEW ||
+        !UNSAFE.compareAndSwapObject(this, runnerOffset,
+                                     null, Thread.currentThread()))
+        return;
+    try {
+        Callable<V> c = callable;
+        //状态再判断一次防止被并发执行了
+        //c就是传入的线程
+        if (c != null && state == NEW) {
+            V result;
+            boolean ran;
+            try {
+                //执行逻辑
+                result = c.call();
+                ran = true;
+            } catch (Throwable ex) {
+                result = null;
+                ran = false;
+                //如果出现一次 那么设置异常结果
+                setException(ex);
+            }
+            if (ran)
+            // 如果成功执行逻辑 那么将结果进行设置
+                set(result);
+        }
+    } finally {
+        //runner在执行中必须不为null 就是为了防止其他的线程再执行
+        //执行完成之后设置为null 是为了防止内存泄露
+        runner = null;
+        // state must be re-read after nulling runner to prevent
+        // leaked interrupts
+
+        //这部分是为了判断执行线程是否被中断进行处理
+        int s = state;
+        if (s >= INTERRUPTING)
+            handlePossibleCancellationInterrupt(s);
+    }
+}
+其中setException(ex)和set(result)方法中都是将当前的FutureTask设置为终态(为EXCEPTIONAL或者NORMAL)
+在设置完这些之后,还需要将等待获取结果的其他线程中断(因为其他线程在get的时候被堵塞了)代码如下：
+private void finishCompletion() {
+    // assert state > COMPLETING;
+    for (WaitNode q; (q = waiters) != null;) {
+        //第一步是将waiters引用设置为null  防止内存泄露
+        if (UNSAFE.compareAndSwapObject(this, waitersOffset, q, null)) {
+            for (;;) {
+                //遍历所有等待的线程 并且将其唤醒
+                //从后面的awaitDone可以看到get请求可能会
+                //被LockSupport.park 完成之后就可以unpark线程
+                Thread t = q.thread;
+                if (t != null) {
+                    q.thread = null;
+                    LockSupport.unpark(t);
+                }
+                WaitNode next = q.next;
+                if (next == null)
+                    break;
+                q.next = null; // unlink to help gc
+                q = next;
+            }
+            break;
+        }
+    }
+
+    //hook方法
+    done();
+    callable = null;        // to reduce footprint
+}
+其中有一个runAndReset方式和run方法很像,其中不同点从名字可以看出来是可以多次执行的
+
+(2).获得计算的值
+public V get() throws InterruptedException, ExecutionException {
+    int s = state;
+    /如果还在计算 那么需要进行等待
+    if (s <= COMPLETING)
+        s = awaitDone(false, 0L);
+    return report(s);
+}
+主要的逻辑是等待：
+private int awaitDone(boolean timed, long nanos)
+    throws InterruptedException {
+    //判断是否是需要校验超时时间
+    final long deadline = timed ? System.nanoTime() + nanos : 0L;
+    WaitNode q = null;
+    boolean queued = false;
+    for (;;) {
+
+        //判断线程是否被中断 中断之后将线程移除
+        if (Thread.interrupted()) {
+            removeWaiter(q);
+            throw new InterruptedException();
+        }
+        //判断状态 如果已经完成了(完成不代表成功 可能表示去取消 成功 或者异常)
+        //那么返回状态.在report(s)会判断是否抛出中断异常 抛出异常 还是返回计算的结果
+        int s = state;
+        if (s > COMPLETING) {
+            if (q != null)
+                //将线程清理 其实在finishCompletion中也有清理 但是这里是为了
+                //多一步保险
+                q.thread = null;
+            return s;
+        }
+
+        //如果在计算中 那么让出cpu 这里不直接park我的理解是
+        //park适用于是NEW的状态 也就是不知道什么时候执行的.但是如果已经开始执行了
+        //那么完全不用睡眠 过一会再试试就行了
+        else if (s == COMPLETING) // cannot time out yet
+            Thread.yield();
+        else if (q == null)
+            //第一笔进来的话 都是null 可能是NEW 那么可以将当前线程保存起来
+            //这里返回之后 还会再次校验是否完成或者是否开始计算 要是都不是的话
+            //那么q就就插入到链表中(插入到首部)
+            q = new WaitNode();
+        else if (!queued)
+            //插入到首部
+            queued = UNSAFE.compareAndSwapObject(this, waitersOffset,
+                                                 q.next = waiters, q);
+        else if (timed) {
+            //这是超时版本的 如果超过时间都没有计算出来 那么直接移除
+            //并且返回状态
+            nanos = deadline - System.nanoTime();
+            if (nanos <= 0L) {
+                removeWaiter(q);
+                return state;
+            }
+            LockSupport.parkNanos(this, nanos);
+        }
+        else
+            //最后没办法 那么只能够将线程设置为睡眠状态了
+            LockSupport.park(this);
+    }
+}
+(3).取消当前的任务
+public boolean cancel(boolean mayInterruptIfRunning) {
+    //只有当前的任务为NEW状态下 才能够被取消
+    //mayInterruptIfRunning 这个很关键 如果是true的话 那么将睡眠的线程中断 awaitDone中park住的线程
+    //如果是false的话 那么只能到finishCompletion中进行唤醒了 但是这样的话 有可能这个时候已经有计算结果了
+    if (!(state == NEW &&
+          UNSAFE.compareAndSwapInt(this, stateOffset, NEW,
+              mayInterruptIfRunning ? INTERRUPTING : CANCELLED)))
+        return false;
+    try {    // in case call to interrupt throws exception
+        if (mayInterruptIfRunning) {
+            try {
+                Thread t = runner;
+                if (t != null)
+                    //将线程进行中断
+                    t.interrupt();
+            } finally { // final state
+                UNSAFE.putOrderedInt(this, stateOffset, INTERRUPTED);
+            }
+        }
+    } finally {
+        finishCompletion();
+    }
+    return true;
+}

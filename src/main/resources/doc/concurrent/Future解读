@@ -1,0 +1,24 @@
+Future解读
+
+1.提供异步计算的功能
+
+2.接口方法
+//取消任务 如果任务已经完成了,或者已经取消了或者其他的一些原因
+//那么将就取消失败 对于取消的任务任务表现的形式也为done
+//mayInterruptIfRunning 是否中断在get上面等待的线程,如果非中断的话那么
+//那么堵塞的线程可能会获得结果 参考: FutureTask
+boolean cancel(boolean mayInterruptIfRunning);
+
+//任务是否被取消了
+boolean isCancelled();
+
+ // 任务是否完成了 注意：完成代表成功. 任务被取消,任务出现一次,或者成功
+//计算完成了 都返回done
+boolean isDone();
+
+//等待计算结果 能够被中断
+V get() throws InterruptedException, ExecutionException;
+
+//等待计算结果 能够被中断 时间版本
+V get(long timeout, TimeUnit unit)
+    throws InterruptedException, ExecutionException, TimeoutException;
