@@ -16,6 +16,9 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.LockSupport;
+import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * @author luqibao
@@ -225,11 +228,22 @@ public class JDKTest<K extends Object & Map, V> implements Serializable {
 
 //        testLinkedHashMap();
 
-        testConcurrentHashMap();
+//        testConcurrentHashMap();
+
+//        testInterrupt();
+
+//        testLockSupport();
+
+//        testInterruptInRunningTime();
+
+//        testReentrantLockInterrupt();
+
+        testAQSCondition();
     }
 
 
     private static int RESIZE_STAMP_BITS = 16;
+
 
     public static void testConcurrentHashMap() {
 
@@ -256,8 +270,8 @@ public class JDKTest<K extends Object & Map, V> implements Serializable {
 
         System.out.println("A".split(",").length);
 
-
     }
+
     public static void testLinkedHashMap() {
 
         Map<String, Integer> integerMap = new LinkedHashMap<String, Integer>() {
@@ -794,13 +808,17 @@ public class JDKTest<K extends Object & Map, V> implements Serializable {
                 TimeUnit.SECONDS.sleep(2);
             } catch (InterruptedException e) {
                 //抛出InterruptedException 的时候中断状态已经被清理了
+
+
                 // 所以1 2 3都为false
                 log("interrupt");
                 log("1 = " + Thread.currentThread().isInterrupted());
                 log("2 = " + Thread.interrupted());
                 log("3 = " + Thread.currentThread().isInterrupted());
                 Thread.currentThread().interrupt();
-                //Thread.currentThread().interrupt() 将状态设置为中断 Thread.interrupted() 返回中断的状态并且将中断状态清理掉
+                //isInterrupted()(非静态方法)返回中断状态但是并不会清除中断状态
+                //Thread.currentThread().interrupt() 如果非堵塞状态 将中断状态设置为true
+                //Thread.interrupted()(静态方法) 返回中断的状态并且将中断状态清理掉
                 // 所以4 = true 5 = true 6 = false
                 log("4 = " + Thread.currentThread().isInterrupted());
                 log("5 = " + Thread.interrupted());
@@ -814,13 +832,134 @@ public class JDKTest<K extends Object & Map, V> implements Serializable {
         Thread.sleep(1000);
         log("main status = " + t1.isInterrupted());
 
+        // 如果处于堵塞状态 进行中断
         t1.interrupt();
         t1.join();
     }
 
+    public static void testLockSupport() throws Exception {
+        /*
+         * output:
+         *  =================================
+         *  before,0
+         *  =================================
+         *  after,5
+         */
+        Integer integer = new Integer(10);
+        Thread thread = new Thread(() -> {
+            log("before,0");
+            long startTime = System.currentTimeMillis();
+            LockSupport.park(integer);
+            log("after," + (System.currentTimeMillis() - startTime) / 1000);
+        });
+
+        thread.start();
+        Thread.sleep(5000);
+        LockSupport.unpark(thread);
+        thread.join();
+    }
+
+    public static void testInterruptInRunningTime() throws Exception {
+        Thread thread = new Thread(() -> {
+            log("before");
+            Thread.currentThread().interrupt();
+            log("after");
+        });
+        thread.start();
+        thread.join();
+
+    }
+
+    public static void testReentrantLockInterrupt() throws Exception {
+
+        ReentrantLock reentrantLock = new ReentrantLock();
+
+        new Thread(() -> {
+            log("lock...");
+            reentrantLock.lock();
+            log("after lock");
+
+        }).start();
+        Thread thread1 = new Thread(() -> {
+            log("lock...");
+            try {
+                //不能中断的
+                reentrantLock.lock();
+                //能够中断
+//                reentrantLock.lockInterruptibly();
+
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+
+            log("after lock");
+        });
+        thread1.start();
+        thread1.interrupt();
+        thread1.join();
+    }
+
+    public static void testAQSCondition() throws Exception {
+//        ReentrantLock reentrantLock = new ReentrantLock();
+//        Condition condition = reentrantLock.newCondition();
+//        reentrantLock.lock();
+//        try{
+//            //必须在reentrantLock获得锁的情况下
+//            condition.wait();
+//        }catch (Exception e){
+//            e.printStackTrace();
+//        }finally {
+//          reentrantLock.unlock();
+//        }
+
+        ReentrantLock reentrantLock = new ReentrantLock();
+        Condition condition = reentrantLock.newCondition();
+
+        try {
+            //抛出 IllegalMonitorStateException
+//            condition.await();
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+//            reentrantLock.unlock();
+        }
+
+
+        Thread h1 = new Thread(() -> {
+            reentrantLock.lock();
+            try {
+                log("before condition");
+                condition.await();
+                log("afters condition");
+            } catch (Exception e) {
+                e.printStackTrace();
+            } finally {
+                log("condition finally");
+                reentrantLock.unlock();
+            }
+        });
+        Thread h2 = new Thread(() -> {
+            reentrantLock.lock();
+            try {
+                log("before signal");
+//                condition.signal();
+                log("afters signal");
+            } catch (Exception e) {
+                e.printStackTrace();
+            } finally {
+                log("signal finally");
+                reentrantLock.unlock();
+            }
+        });
+
+        h1.start();
+        h2.start();
+        TimeUnit.SECONDS.sleep(2);
+
+    }
+
+
     public static void testFinalize() throws Exception {
-
-
         FinalizeClass finalizeClass = new FinalizeClass();
         finalizeClass = null;
         System.gc();
