@@ -32,7 +32,7 @@ maximumPoolSize: 第一个参数中我们讲到大于corePoolSize队列的时候
 keepAliveTime: 线程池中任务的默认存活时间(没有任务进来),默认情况下是非核心线程的最大存活时间,但是也可以设置核心线程
 也存在最大存活时间(通过public void allowCoreThreadTimeOut(boolean value)进行设置)
 
-c:存放任务的地方,这部分任务是还没有执行的,BlockingQueue存储,详情见《BlockingQueue解读》。
+workQueues:存放任务的地方,这部分任务是还没有执行的,BlockingQueue存储,详情见《BlockingQueue解读》。
 
 threadFactory:ThreadFactory,可以通过它指定线程池中线程的优先级,线程名字等等 详情见《ThreadGroup解读》
 
@@ -478,32 +478,3 @@ public boolean awaitTermination(long timeout, TimeUnit unit)
         mainLock.unlock();
     }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
