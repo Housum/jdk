@@ -1,0 +1,91 @@
+AbstractExecutorService解读
+
+1.骨架类,实现了ExecutorService,提供了submit invokeAll,和invokeAny方法,这些方式是通过
+newTaskFor方法返回的RunnableFuture执行的.而默认的实现类是FutureTask,newTaskFor是protected的,
+子类可以重载
+
+2.方法实现
+
+(1).
+//创建新的RunnableFuture
+protected <T> RunnableFuture<T> newTaskFor(Callable<T> callable) {
+    return new FutureTask<T>(callable);
+}
+(2).submit 的实现
+public Future<?> submit(Runnable task) {
+    if (task == null) throw new NullPointerException();
+    RunnableFuture<Void> ftask = newTaskFor(task, null);
+    //执行方法
+    execute(ftask);
+    return ftask;
+}
+其他的submit也是类似
+
+(3).invoke*的实现方式,其中最主要的是使用了CompletionService
+以invokeAny为例：
+
+//...
+try {
+    ExecutionException ee = null;
+    final long deadline = timed ? System.nanoTime() + nanos : 0L;
+
+    //所有的任务
+    Iterator<? extends Callable<T>> it = tasks.iterator();
+
+    futures.add(ecs.submit(it.next()));
+    --ntasks;
+    int active = 1;
+
+    for (;;) {
+        Future<T> f = ecs.poll();
+        if (f == null) {
+        //如果已经提交的任务没有完成 那么进行处理
+            if (ntasks > 0) {
+            //还有没有提交的任务 进行提交
+                --ntasks;
+                futures.add(ecs.submit(it.next()));
+                ++active;
+            }
+            //如果任务已经全部提交了 那么退出
+            else if (active == 0)
+                break;
+            else if (timed) {
+                //检查时间超时
+                f = ecs.poll(nanos, TimeUnit.NANOSECONDS);
+                if (f == null)
+                    throw new TimeoutException();
+                nanos = deadline - System.nanoTime();
+            }
+            else
+            //最后只能堵塞等待结果
+                f = ecs.take();
+        }
+        if (f != null) {
+            --active;
+            try {
+                //获取结果 这里直接返回  但是可能是抛出异常 详情见《FutureTask解读》
+                return f.get();
+            } catch (ExecutionException eex) {
+                ee = eex;
+            } catch (RuntimeException rex) {
+                ee = new ExecutionException(rex);
+            }
+        }
+    }
+
+    if (ee == null)
+        ee = new ExecutionException();
+    throw ee;
+
+} finally {
+    //将没有返回结果的其他任务给取消掉
+    for (int i = 0, size = futures.size(); i < size; i++)
+        futures.get(i).cancel(true);
+}
+
+invokeAll类似,只是改成等待所有的任务完成
+
+
+
+
+

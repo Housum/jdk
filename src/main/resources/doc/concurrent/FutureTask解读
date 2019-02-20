@@ -34,7 +34,7 @@ public void run() {
     try {
         Callable<V> c = callable;
         //状态再判断一次防止被并发执行了
-        //c就是传入的线程
+        //c就是传入的任务
         if (c != null && state == NEW) {
             V result;
             boolean ran;

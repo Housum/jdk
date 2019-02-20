@@ -1,0 +1,22 @@
+CompletionService解读
+
+1.将一步任务的提交和消费任务的结果进行解耦的服务类，什么意思呢？比如提交多个任务给该服务
+执行,另外的多个或者一个线程可以通过poll拿到结果 这样就把执行任务和获取结果给姐耦了.典型的
+使用场景就是异步IO,先提交任务执行,在其他时间或者其他线程通过poll拿到执行的结果.见《ExecutorCompletionService解读》
+
+2.方法
+
+提交任务
+Future<V> submit(Callable<V> task)
+
+提交任务
+Future<V> submit(Runnable task, V result)
+
+很关键 见《BlockingQueue 解读》 一直堵塞知道有任务完成咯
+Future<V> take() throws InterruptedException
+
+很关键 见《BlockingQueue 解读》 返回null 如果没有完成的任务
+Future<V> poll();
+
+很关键 见《BlockingQueue 解读》 超时没有结果返回null
+Future<V> poll(long timeout, TimeUnit unit) throws InterruptedException;

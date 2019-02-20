@@ -1,0 +1,33 @@
+ExecutorCompletionService解读
+
+1.实现CompletionService,实现方式是将任务执行委托Executor,然后在任务完成之后加入到队列
+
+2.其中最主要的实现在于:
+
+执行的任务为:
+private class QueueingFuture extends FutureTask<Void> {
+    QueueingFuture(RunnableFuture<V> task) {
+        super(task, null);
+        this.task = task;
+    }
+    //这个方法是FutureTask的hook方法 在任务执行完成之后加入到
+    //队列中 completionQueue是BlockingQueue  默认是LinkedBlockingQueue
+    protected void done() { completionQueue.add(task); }
+    private final Future<V> task;
+}
+
+比如：
+public Future<V> submit(Callable<V> task) {
+    if (task == null) throw new NullPointerException();
+    RunnableFuture<V> f = newTaskFor(task);
+    //这里执行的就是QueueingFuture
+    executor.execute(new QueueingFuture(f));
+    return f;
+}
+
+而对于获取结果的其实就是代理了一下BlockingQueue的 take poll 方法
+比如：
+public Future<V> take() throws InterruptedException {
+    return completionQueue.take();
+}
+

@@ -1,0 +1,48 @@
+ExecutorService解读
+
+1.在Executor之上提供了管理线程的生命周期和管理线程池的功能
+
+2.方法
+(1).停止线程池
+void shutdown() 并不是马上停止线程池 而是停止接受新的任务并且等待剩下的任务执行完成
+List<Runnable> shutdownNow() 停止线程池 并且返回<strong>已经提交但是还未执行的任务</strong>,
+执行中的任务可能就失败也可能成功.
+
+(2).状态统计
+是否已经停止了
+boolean isShutdown();
+
+是否终止了(线程池到了终态)
+boolean isTerminated();
+
+等待线程池直到终止 终止表示的就是线程真正的结束了(停止的话 还是有可能有遗留线程正在运行)
+如果被中断 那么直接返回
+boolean awaitTermination(long timeout, TimeUnit unit)
+throws InterruptedException;
+
+提交一个Callable 并且返回一个Future @see Future解读
+<T> Future<T> submit(Callable<T> task);
+
+提交一个Runnable 并且返回一个Future future返回的结果是result
+<T> Future<T> submit(Runnable task, T result);
+
+提交一个Runnable 并且返回一个Future future返回的结果是null
+Future<?> submit(Runnable task);
+
+执行所有的任务  返回Future
+<T> List<Future<T>> invokeAll(Collection<? extends Callable<T>> tasks)
+        throws InterruptedException;
+
+具有时间限制的 如果超时 那么抛出TimeoutException
+<T> List<Future<T>> invokeAll(Collection<? extends Callable<T>> tasks,
+                             long timeout, TimeUnit unit)
+throws InterruptedException;
+
+执行其中的一个 基本上是返回执行最快的那个任务的结果
+<T> T invokeAny(Collection<? extends Callable<T>> tasks)
+        throws InterruptedException, ExecutionException;
+
+上面的超时版本
+ <T> T invokeAny(Collection<? extends Callable<T>> tasks,
+                   long timeout, TimeUnit unit)
+       throws InterruptedException, ExecutionException, TimeoutException;
