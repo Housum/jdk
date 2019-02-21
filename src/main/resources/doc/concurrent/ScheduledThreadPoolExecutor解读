@@ -4,7 +4,10 @@ ScheduledThreadPoolExecutor解读
 2.内部类
 2.1 DelayedWorkQueue
 2.2 ScheduledFutureTask
-
+3 原理分析
+3.1  整体流程
+3.2  方法分析
+4 属性
 
 
 1.实现ScheduleExecutorService,详情见《ScheduleExecutorService解读》.
@@ -27,7 +30,7 @@ ScheduledThreadPoolExecutor解读
 2.内部类
 
 (1).DelayedWorkQueue:
-相关:leader-follower(LF)多线程网络模型
+相关:leader-follower(LF)多线程网络模型 http://ifeve.com/leader-follower-thread-model/
 
 该类实现了按照执行时间的优先级堵塞队列,详情见《BlockingQueue详解》数据结构为二叉堆, 没有太多需要关注的东西
 static class DelayedWorkQueue extends AbstractQueue<Runnable>
