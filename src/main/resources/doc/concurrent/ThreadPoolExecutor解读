@@ -478,3 +478,37 @@ public boolean awaitTermination(long timeout, TimeUnit unit)
         mainLock.unlock();
     }
 }
+(4)预启动线程
+可以预先启动核心线程
+public boolean prestartCoreThread() {
+    //当核心线程小于配置值 那么启动一个核心的线程
+    return workerCountOf(ctl.get()) < corePoolSize &&
+        addWorker(null, true);
+}
+确保有线程池已经启动了，有线程可以使用.详情见《ScheduleThreadPoolExecutor解读》
+void ensurePrestart() {
+    int wc = workerCountOf(ctl.get());
+    if (wc < corePoolSize)
+        addWorker(null, true);
+    else if (wc == 0)
+        addWorker(null, false);
+}
+启动所有的核心线程
+public int prestartAllCoreThreads() {
+    int n = 0;
+    //如果返回false 说明核心线程已经全部启动了
+    while (addWorker(null, true))
+        ++n;
+    return n;
+}
+//为ThreadPoolExecutor中的方法
+void ensurePrestart() {
+    int wc = workerCountOf(ctl.get());
+    if (wc < corePoolSize)
+        addWorker(null, true);
+    else if (wc == 0)
+        addWorker(null, false);
+}
+
+
+

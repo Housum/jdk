@@ -95,7 +95,10 @@ private void finishCompletion() {
     done();
     callable = null;        // to reduce footprint
 }
-其中有一个runAndReset方式和run方法很像,其中不同点从名字可以看出来是可以多次执行的
+其中有一个runAndReset方式和run方法很像,其中不同点从名字可以看出来是可以多次执行的,其中的原理就是
+执行完成之后不改变状态.依旧是NEW状态, 使用案例可见 《ScheduledThreadPoolExecutor解读》
+ScheduledThreadPoolExecutor.ScheduledFutureTask.run
+
 
 (2).获得计算的值
 public V get() throws InterruptedException, ExecutionException {

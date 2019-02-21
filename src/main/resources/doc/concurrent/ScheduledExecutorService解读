@@ -1,0 +1,26 @@
+ScheduleExecutorService解读
+
+1.该接口定义了定时任务调度的东西
+
+(1).
+延迟执行:
+public ScheduledFuture<?> schedule(Runnable command,
+                                       long delay, TimeUnit unit);
+public <V> ScheduledFuture<V> schedule(Callable<V> callable,
+                                           long delay, TimeUnit unit);
+
+定义执行:
+public ScheduledFuture<?> scheduleAtFixedRate(Runnable command,
+                                                  long initialDelay,
+                                                  long period,
+                                                  TimeUnit unit);
+public ScheduledFuture<?> scheduleWithFixedDelay(Runnable command,
+                                                     long initialDelay,
+                                                     long delay,
+                                                     TimeUnit unit);
+
+两者的区别,
+FixedRate表示的是固定的时间周期,不关注上一个任务的执行时间,但是在上一个没有执行完成下一个任务还是
+不能执行的: 比如上个任务执行过程很久到下一个执行周期来临之前都不能执行完的话,那么下一个任务不会被执行.等到上一个
+任务一旦执行完成,那么下一个任务马上会被出发,如果严重的话,可能上一个任务执行完成,后面连续会执行多次（@see JDKTest.testScheduleExecutorServiceFixDate）
+FixedDelay表示的是每隔多久执行,前后执行的任务时间是有关联的 J@see DKTest.testScheduleExecutorServiceFixDelayed

@@ -1,0 +1,254 @@
+ScheduledThreadPoolExecutor解读
+
+1.概述
+2.内部类
+2.1 DelayedWorkQueue
+2.2 ScheduledFutureTask
+
+
+
+1.实现ScheduleExecutorService,详情见《ScheduleExecutorService解读》.
+实现的原理:
+
+继承了ThreadPoolExecutor(详情见《ThreadPoolExecutor解读》),在ThreadPoolExecutor的基础上
+固定了自己的工作队列,该队列类似优先队列(详情见《PriorityQueue解读》)能够按照任务的执行时间排列,将
+要执行的工作任务放在了头部.这样getTask中workQueue的take和poll方法拿到的就是执行时间离now最近的任务.
+
+同时对于工作任务没有使用FutureTask而是自定义了工作任务,其中做了添加了一下时间和定时相关的属性.增加了下一次执行
+任务的时间
+
+对于原有的execute和submit*方法,也覆盖了.把这些任务设置为执行时间为0的任务(这些任务将会在工作队列中的首部直接被worker拿出
+来执行)
+
+如何实现一个任务定时执行？
+因为任务是放入到工作队列workQueue中的,所以每次执行之后都会被poll或者take移除,所以如果是定时的任务的话,那么在执行完成之后
+会被重新计算下一次执行的时间并且加入到工作队列
+
+2.内部类
+
+(1).DelayedWorkQueue:
+相关:leader-follower(LF)多线程网络模型
+
+该类实现了按照执行时间的优先级堵塞队列,详情见《BlockingQueue详解》数据结构为二叉堆, 没有太多需要关注的东西
+static class DelayedWorkQueue extends AbstractQueue<Runnable>
+    implements BlockingQueue<Runnable> {
+
+(2).ScheduledFutureTask:
+继承了FutureTask
+private class ScheduledFutureTask<V>
+        extends FutureTask<V> implements RunnableScheduledFuture<V>
+相关的属性:
+//在加入队列中 如果两个任务的时间相同的话 那么通过sequenceNumber进行比较
+//具体看ScheduledFutureTask的compareTo方法,sequenceNumber由ScheduledThreadPoolExecutor的
+//AtomicLong sequencer = new AtomicLong()生成
+private final long sequenceNumber;
+
+//任务将要执行的时间 纳秒为单位
+private long time;
+
+//任务的执行的周期  为纳秒 如果为0的话 那么非周期性任务 如果大于0的情况下那么为fixedDate情况
+//如果为小于0的话 那么为fixedDelay
+private final long period;
+
+//执行的任务 因为有可能会被重新加入到队列 所以保存了原有的任务
+RunnableScheduledFuture<V> outerTask = this;
+
+在二叉堆中关联了元素 可以快速的查询数据,同时在队列中一个任务不能重复的出现
+所以需要通过这个index进行识别. 当被移除或者取消的时候设置为-1
+int heapIndex;
+方法：
+取消任务
+public boolean cancel(boolean mayInterruptIfRunning) {
+    //调用FutureTask的取消方法 详情见《FutureTask解读》
+    boolean cancelled = super.cancel(mayInterruptIfRunning);
+    //默认是不会删除取消的任务 如果想要移除取消的任务 那么可以设置removeOnCancel为true
+    if (cancelled && removeOnCancel && heapIndex >= 0)
+        调用ThreadPoolExecutor的remove将任务从队列中移除
+        remove(this);
+    return cancelled;
+}
+任务的执行：
+public void run() {
+        //1.检查是否能够执行 如果不能执行的话 那么就取消并且移除任务
+        //2.如果不是周期性的话 那么直接执行任务就可以了
+        //3.如果是周期的话 那么执行任务.这里调用了FutureTask的runAndReset，详情见《FutureTask解读》
+        boolean periodic = isPeriodic();
+        if (!canRunInCurrentRunState(periodic))
+            cancel(false);
+        else if (!periodic)
+            ScheduledFutureTask.super.run();
+        else if (ScheduledFutureTask.super.runAndReset()) {
+            //这里设置下一次执行的时间
+            setNextRunTime();
+            //因为任务已经被执行了 那么任务已经从任务队列中take或者poll了
+            //所以需要重新加入到工作队列
+            reExecutePeriodic(outerTask);
+        }
+}
+void reExecutePeriodic(RunnableScheduledFuture<?> task) {
+    if (canRunInCurrentRunState(true)) {
+        super.getQueue().add(task);
+        //因为可以有并发的问题 所以再次的检查 如果不能RUN的话 那么回滚状态
+        if (!canRunInCurrentRunState(true) && remove(task))
+            task.cancel(false);
+        else
+            //这里很重要 详情见《ThreadPoolExecutor解读》
+            ensurePrestart();
+    }
+}
+
+3.原理分析
+(1).整个的一个流程
+首先新建一个定时任务执行器的时候,就初始化了一个按照执行时间储存的优先级堵塞队列 -> 加入定时任务,将任务进行包装计算出
+执行的时间并且确保线程池中有工作线程执行->工作线程通过take一直堵塞在队列的获取上面,拿到优先级堵塞队列的首元素检查元素
+是否已经到了可以执行的时间了,如果没有的话,那么不返回-> 如果执行完任务之后,计算下一次执行的时间并且将任务重新放入到工作
+队列中
+
+(2).方法分析
+
+构造函数:
+public ScheduledThreadPoolExecutor(int corePoolSize) {
+    //这里设置固定的工作队列为DelayedWorkQueue
+    super(corePoolSize, Integer.MAX_VALUE, 0, NANOSECONDS,
+          new DelayedWorkQueue());
+}
+
+执行ThreadPoolExecutor原有的任务,其他的submit*都是类似的
+public void execute(Runnable command) {
+    //这里是将任务包装成了一个时间为0的任务 就是一加入到工作队列就可以拿出来执行了
+    schedule(command, 0, NANOSECONDS);
+}
+
+延迟执行方法Runnable 和Callable是同样的逻辑 因为RunnableScheduledFuture继承自FutureTask
+public ScheduledFuture<?> schedule( Runnable command,
+                                   long delay,
+                                   TimeUnit unit) {
+    if (command == null || unit == null)
+        throw new NullPointerException();
+    //这里是初始化了一个RunnableScheduledFuture decorateTask方法是一个留给
+    //字类实现的方法 可以对对象进行包装
+    RunnableScheduledFuture<?> t = decorateTask(command,
+        new ScheduledFutureTask<Void>(command, null,
+                                      triggerTime(delay, unit)));
+
+    //这个方法很重要 主要就是将任务放入到工作队列中 并且启动工作线程去处理任务
+    delayedExecute(t);
+    return t;
+}
+private void delayedExecute(RunnableScheduledFuture<?> task) {
+        //如果线程池已经停止了 那么拒绝任务
+        if (isShutdown())
+            reject(task);
+        else {
+            //否则的话 将任务加入到工作队列
+            super.getQueue().add(task);
+
+            //可以出现并发停止
+            if (isShutdown() &&
+                !canRunInCurrentRunState(task.isPeriodic()) &&
+                remove(task))
+                task.cancel(false);
+            else
+                //确保工作队列中有工作线程 详情见《ThreadPoolExecutor解读》
+                ensurePrestart();
+        }
+}
+
+周期方法
+FixedRate版本
+public ScheduledFuture<?> scheduleAtFixedRate(Runnable command,
+                                              long initialDelay,
+                                              long period,
+                                              TimeUnit unit) {
+    if (command == null || unit == null)
+        throw new NullPointerException();
+    if (period <= 0)
+        throw new IllegalArgumentException();
+
+    //构造任务
+    ScheduledFutureTask<Void> sft =
+        new ScheduledFutureTask<Void>(command,
+                                      null,
+                                      triggerTime(initialDelay, unit),
+                                      unit.toNanos(period));
+    RunnableScheduledFuture<Void> t = decorateTask(command, sft);
+    // 注意这里 设置了outerTask 为了在后面将任务重新的加入到工作队列中
+    sft.outerTask = t;
+    //参考前面分析
+    delayedExecute(t);
+    return t;
+}
+FixedDelay版本 基本全部相同
+public ScheduledFuture<?> scheduleWithFixedDelay(Runnable command,
+                                                     long initialDelay,
+                                                     long delay,
+                                                     TimeUnit unit) {
+        if (command == null || unit == null)
+            throw new NullPointerException();
+        if (delay <= 0)
+            throw new IllegalArgumentException();
+        ScheduledFutureTask<Void> sft =
+            new ScheduledFutureTask<Void>(command,
+                                          null,
+                                          triggerTime(initialDelay, unit),
+                                          //注意这里不一样 分析内部类的时候 period字段具有
+                                          //不同的含义
+                                          unit.toNanos(-delay));
+        RunnableScheduledFuture<Void> t = decorateTask(command, sft);
+        sft.outerTask = t;
+        delayedExecute(t);
+        return t;
+}
+任务重新加入队列
+这里没啥特殊的逻辑 就是将任务重新给加入到了工作队列中
+void reExecutePeriodic(RunnableScheduledFuture<?> task) {
+    if (canRunInCurrentRunState(true)) {
+        super.getQueue().add(task);
+        if (!canRunInCurrentRunState(true) && remove(task))
+            task.cancel(false);
+        else
+            ensurePrestart();
+    }
+}
+
+shutdown的hook任务
+void onShutdown() {
+    BlockingQueue<Runnable> q = super.getQueue();
+
+    //参考属性
+    boolean keepDelayed =
+        getExecuteExistingDelayedTasksAfterShutdownPolicy();
+    boolean keepPeriodic =
+        getContinueExistingPeriodicTasksAfterShutdownPolicy();
+    if (!keepDelayed && !keepPeriodic) {
+        for (Object e : q.toArray())
+            if (e instanceof RunnableScheduledFuture<?>)
+                ((RunnableScheduledFuture<?>) e).cancel(false);
+        q.clear();
+    }
+    else {
+        // Traverse snapshot to avoid iterator exceptions
+        for (Object e : q.toArray()) {
+            if (e instanceof RunnableScheduledFuture) {
+                RunnableScheduledFuture<?> t =
+                    (RunnableScheduledFuture<?>)e;
+                if ((t.isPeriodic() ? !keepPeriodic : !keepDelayed) ||
+                    t.isCancelled()) { // also remove if already cancelled
+                    if (q.remove(t))
+                        t.cancel(false);
+                }
+            }
+        }
+    }
+    tryTerminate();
+}
+
+
+4.属性
+executeExistingDelayedTasksAfterShutdown 当线程池shutdown的时候是否执行
+DelayedTask的任务
+
+continueExistingPeriodicTasksAfterShutdown 当线程池shutdown的时候是否执行
+FixedRate的任务
+
+removeOnCancel 当任务被取消 是否从工作队列中移除

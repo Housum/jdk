@@ -14,7 +14,10 @@ import java.text.Collator;
 import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.LockSupport;
@@ -240,11 +243,90 @@ public class JDKTest<K extends Object & Map, V> implements Serializable {
 
 //        testAQSCondition();
 
-        testPrintThreadPoolStatus();
+//        testPrintThreadPoolStatus();
+
+//        testScheduleExecutorServiceFixRate();
+
+        testScheduleExecutorServiceFixDelayed();
     }
 
 
     private static int RESIZE_STAMP_BITS = 16;
+
+
+    public static void testScheduleExecutorServiceFixRate() throws Exception {
+
+
+        /*
+         * output :
+         * =================================
+         * time :2
+         * =================================
+         * time :8
+         * =================================
+         * time :8
+         * =================================
+         * time :8
+         * =================================
+         * time :10
+         * =================================
+         * time :12
+         * */
+        ScheduledExecutorService scheduledExecutorService = new ScheduledThreadPoolExecutor(2);
+
+        AtomicBoolean first = new AtomicBoolean(true);
+
+        long startTime = System.currentTimeMillis();
+        scheduledExecutorService.scheduleAtFixedRate(() -> {
+            log("time :" + (System.currentTimeMillis() - startTime) / 1000);
+            if (first.get()) {
+                try {
+                    TimeUnit.SECONDS.sleep(6);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+                first.set(false);
+            }
+        }, 2, 2, TimeUnit.SECONDS);
+
+        scheduledExecutorService.awaitTermination(60, TimeUnit.SECONDS);
+    }
+
+    public static void testScheduleExecutorServiceFixDelayed() throws Exception {
+
+
+        ScheduledExecutorService scheduledExecutorService = new ScheduledThreadPoolExecutor(2);
+        AtomicBoolean first = new AtomicBoolean(true);
+        /*
+        * output:
+        =================================
+        time :2
+        =================================
+        time :10
+        =================================
+        time :12
+        =================================
+        time :14
+        =================================
+        time :16
+        *
+        *
+        * */
+        long startTime = System.currentTimeMillis();
+        scheduledExecutorService.scheduleWithFixedDelay(() -> {
+            log("time :" + (System.currentTimeMillis() - startTime) / 1000);
+            if (first.get()) {
+                try {
+                    TimeUnit.SECONDS.sleep(6);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+                first.set(false);
+            }
+        }, 2, 2, TimeUnit.SECONDS);
+
+        scheduledExecutorService.awaitTermination(60, TimeUnit.SECONDS);
+    }
 
 
     public static void testConcurrentHashMap() {
@@ -959,29 +1041,31 @@ public class JDKTest<K extends Object & Map, V> implements Serializable {
         TimeUnit.SECONDS.sleep(2);
 
     }
-    private static final int COUNT_BITS = Integer.SIZE - 3;
-    private static final int CAPACITY   = (1 << COUNT_BITS) - 1;
-    private static final int RUNNING    = -1 << COUNT_BITS;
-    private static final int SHUTDOWN   =  0 << COUNT_BITS;
-    private static final int STOP       =  1 << COUNT_BITS;
-    private static final int TIDYING    =  2 << COUNT_BITS;
-    private static final int TERMINATED =  3 << COUNT_BITS;
 
-    public static void testPrintThreadPoolStatus(){
-        log(Integer.toString(CAPACITY,2));
-        log(Integer.toString(RUNNING,2));
-        log(Integer.toString(SHUTDOWN,2));
-        log(Integer.toString(STOP,2));
-        log(Integer.toString(TIDYING,2));
-        log(Integer.toString(TERMINATED,2));
+    private static final int COUNT_BITS = Integer.SIZE - 3;
+    private static final int CAPACITY = (1 << COUNT_BITS) - 1;
+    private static final int RUNNING = -1 << COUNT_BITS;
+    private static final int SHUTDOWN = 0 << COUNT_BITS;
+    private static final int STOP = 1 << COUNT_BITS;
+    private static final int TIDYING = 2 << COUNT_BITS;
+    private static final int TERMINATED = 3 << COUNT_BITS;
+
+    public static void testPrintThreadPoolStatus() {
+        log(Integer.toString(CAPACITY, 2));
+        log(Integer.toString(RUNNING, 2));
+        log(Integer.toString(SHUTDOWN, 2));
+        log(Integer.toString(STOP, 2));
+        log(Integer.toString(TIDYING, 2));
+        log(Integer.toString(TERMINATED, 2));
         log("runStateOf");
         log(runStateOf(RUNNING));
 
 
-
     }
 
-    private static int runStateOf(int c)     { return c & ~CAPACITY; }
+    private static int runStateOf(int c) {
+        return c & ~CAPACITY;
+    }
 
     public static void testFinalize() throws Exception {
         FinalizeClass finalizeClass = new FinalizeClass();
