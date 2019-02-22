@@ -1,0 +1,279 @@
+ArrayBlockingQueue 解读
+
+
+1.概述
+2.主要的流程
+3.方法分析
+3.1 插入元素
+3.1.1 add
+3.1.2 offer
+3.1.3 put
+3.1.4 offer(timeout)
+3.2 获取元素
+3.2.1 remove
+3.2.2 take
+3.2.3 poll
+3.2.4 poll(timeout)
+3.3 查看元素
+3.3.1 peek
+3.3.2 element
+3.3 通用方法
+remainingCapacity
+drainTo
+
+
+
+
+1.实现了BlockingQueue,堵塞队列.底层是通过数组的方式实现的,并且是一个固定长度的队列
+一旦我们在构造函数中制定了队列的大小,那么就不能被修改了.其中主要是使用了显示锁ReentrantLock
+和Condition实现的,详情见《AbstractQueuedSynchronizer解读》
+
+2.主要的流程:
+
+插入数据->插入数据,通知那些因为没有数据而堵塞的线程,如果容量已经满了,堵塞插入操作直到有空间为止->获取数据,并且通知之前因为没有
+容量而堵塞的线程释放,如果没有数据那么需要进行堵塞直到有数据为止
+
+3.方法分析
+根据BlockingQueue的方法进行分析，详情请见《BlockingQueue详解》
+
+插入元素:
+add:
+public boolean add(E e) {
+    //使用了offer能力
+    if (offer(e))
+        return true;
+    else
+        throw new IllegalStateException("Queue full");
+}
+offer:
+public boolean offer(E e) {
+    checkNotNull(e);
+    //condition前需要加锁
+    final ReentrantLock lock = this.lock;
+    lock.lock();
+    try {
+        //如果当前的数量已经等于队列的长度了 那么返回false表示不能插入了
+        if (count == items.length)
+            return false;
+        else {
+            //添加元素
+            enqueue(e);
+            return true;
+        }
+    } finally {
+        lock.unlock();
+    }
+}
+put:
+public void put(E e) throws InterruptedException {
+    checkNotNull(e);
+    final ReentrantLock lock = this.lock;
+    lock.lockInterruptibly();
+    try {
+        //因为put是堵塞的方式的 所以如果已经满了的话 那么进行堵塞
+        //直到有空间之后 才能插入元素. 这里使用while就是为了防止被唤醒
+        //之后又有其他的线程并发插入元素
+        while (count == items.length)
+            notFull.await();
+        //添加元素
+        enqueue(e);
+    } finally {
+        lock.unlock();
+    }
+}
+offer(timeout):
+public boolean offer(E e, long timeout, TimeUnit unit)
+        throws InterruptedException {
+
+        checkNotNull(e);
+        long nanos = unit.toNanos(timeout);
+        final ReentrantLock lock = this.lock;
+        lock.lockInterruptibly();
+        try {
+            while (count == items.length) {
+                if (nanos <= 0)
+                    return false;
+                //等待一段时间 如果还是不能插入的话
+                //到时间点之后 还是不能插入的话 那么返回false
+                nanos = notFull.awaitNanos(nanos);
+            }
+            //插入元素
+            enqueue(e);
+            return true;
+        } finally {
+            lock.unlock();
+        }
+}
+//插入元素
+private void enqueue(E x) {
+        // assert lock.getHoldCount() == 1;
+        // assert items[putIndex] == null;
+        final Object[] items = this.items;
+        items[putIndex] = x;
+        // 这里是插入之后 计算下一个插入的索引
+        // 采用的是环形的方式视同内部的数组
+        if (++putIndex == items.length)
+            putIndex = 0;
+        count++;
+        //在插入之后 就马上发出通知 防止有因为没有
+        //元素而堵塞的线程 见take()
+        notEmpty.signal();
+}
+获取元素
+remove:
+public E remove() {
+    //使用的还是poll的能力
+    E x = poll();
+    if (x != null)
+        return x;
+    else
+        throw new NoSuchElementException();
+}
+take:
+public E take() throws InterruptedException {
+    final ReentrantLock lock = this.lock;
+    lock.lockInterruptibly();
+    try {
+        //如果数目为0的话 那么说明元素可以被获取了
+        //一直等待
+        while (count == 0)
+            notEmpty.await();
+            //获取操作
+        return dequeue();
+    } finally {
+        lock.unlock();
+    }
+}
+poll:
+public E poll() {
+    final ReentrantLock lock = this.lock;
+    lock.lock();
+    try {
+        //没有的话 那么直接返回null
+        return (count == 0) ? null : dequeue();
+    } finally {
+        lock.unlock();
+    }
+}
+poll(timeout)
+public E poll(long timeout, TimeUnit unit) throws InterruptedException {
+        long nanos = unit.toNanos(timeout);
+        final ReentrantLock lock = this.lock;
+        lock.lockInterruptibly();
+        try {
+            while (count == 0) {
+                if (nanos <= 0)
+                    return null;
+                    //如果是为0 没有容量的话 那么等待一定的时间 如果
+                    //没有的话 那么返回null
+                nanos = notEmpty.awaitNanos(nanos);
+            }
+            return dequeue();
+        } finally {
+            lock.unlock();
+        }
+}
+private E dequeue() {
+        // assert lock.getHoldCount() == 1;
+        // assert items[takeIndex] != null;
+        final Object[] items = this.items;
+        @SuppressWarnings("unchecked")
+        E x = (E) items[takeIndex];
+        items[takeIndex] = null;
+        //计算出下一个获取的索引
+        if (++takeIndex == items.length)
+            takeIndex = 0;
+        count--;
+        if (itrs != null)
+            itrs.elementDequeued();
+            //这里是唤醒那些因为容量已经满的线程
+            //见put()
+        notFull.signal();
+        return x;
+}
+peek:
+public E peek() {
+    final ReentrantLock lock = this.lock;
+    lock.lock();
+    try {
+        //并不将元素移除 只是返回
+        return itemAt(takeIndex); // null when queue is empty
+    } finally {
+        lock.unlock();
+    }
+}
+element:
+public E element() {
+//包装了一下
+    E x = peek();
+    if (x != null)
+        return x;
+    else
+        throw new NoSuchElementException();
+}
+剩下的容量:
+public int remainingCapacity() {
+    final ReentrantLock lock = this.lock;
+    lock.lock();
+    try {
+        //减去已经存在的数目
+        return items.length - count;
+    } finally {
+        lock.unlock();
+    }
+}
+//将队列中的元素都移动到集合中
+public int drainTo(Collection<? super E> c, int maxElements) {
+        checkNotNull(c);
+        if (c == this)
+            throw new IllegalArgumentException();
+        if (maxElements <= 0)
+            return 0;
+        final Object[] items = this.items;
+        final ReentrantLock lock = this.lock;
+        lock.lock();
+        try {
+            int n = Math.min(maxElements, count);
+            // 从获取点开始获取数据
+            int take = takeIndex;
+            int i = 0;
+            try {
+                while (i < n) {
+                    @SuppressWarnings("unchecked")
+                    E x = (E) items[take];
+                    //拿到数据 插入到集合中
+                    c.add(x);
+                    //清理位置 help GC
+                    items[take] = null;
+                    if (++take == items.length)
+                        take = 0;
+                    i++;
+                }
+                return n;
+            } finally {
+                // Restore invariants even if c.add() threw
+                if (i > 0) {
+                    count -= i;
+                    takeIndex = take;
+                    if (itrs != null) {
+                        if (count == 0)
+                            itrs.queueIsEmpty();
+                        else if (i > take)
+                            itrs.takeIndexWrapped();
+                    }
+                    for (; i > 0 && lock.hasWaiters(notFull); i--)
+                    // 如果有线程因为容量满了之后 在等待 那么
+                    //进行唤醒
+                        notFull.signal();
+                }
+            }
+        } finally {
+            lock.unlock();
+        }
+}
+
+
+
+
+
+
