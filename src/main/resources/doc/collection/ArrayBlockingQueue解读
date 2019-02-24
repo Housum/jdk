@@ -20,13 +20,21 @@ ArrayBlockingQueue 解读
 3.3 通用方法
 remainingCapacity
 drainTo
-
+4.数据结构
 
 
 
 1.实现了BlockingQueue,堵塞队列.底层是通过数组的方式实现的,并且是一个固定长度的队列
-一旦我们在构造函数中制定了队列的大小,那么就不能被修改了.其中主要是使用了显示锁ReentrantLock
-和Condition实现的,详情见《AbstractQueuedSynchronizer解读》
+一旦我们在构造函数中指定了队列的大小,那么就不能被修改了.实现上主要是使用了显示锁ReentrantLock
+和Condition实现的,详情见《AbstractQueuedSynchronizer解读》.插入数据的时候和消费数据的时候就加独占上锁,
+插入数据时候如果数组中已经满了的话那么就直接通过await直到有元素被消费了被signal唤醒.如果消费数据的时候
+没有数据的话 那么await直到有元素被插入了被signal唤醒
+
+和LinkedBlockingQueue(详情见《LinkedBlockingQueue解读》)
+相比 有更高的系统性能,但是吞吐量没有它高. 因为数据结构的问题以及LinkedBlockingQueue使用了读写分开的锁详情见《LinkedBlockingQueue解读》
+
+对于ArrayBlockingQueue还有一特性,那就是可以指定是否线程的获取和插入是否具有公平性(使用ReentrantLock实现),这个特新是LinkedBlockingQueue
+没有的
 
 2.主要的流程:
 
@@ -271,9 +279,29 @@ public int drainTo(Collection<? super E> c, int maxElements) {
             lock.unlock();
         }
 }
+4.数据结构
+final Object[] items;
+存放元素的数组 定长的,在构造函数中需要指定
 
+int takeIndex; 获取数据的索引 从0开始,一直到capacity-1,
+每次获取一个元素就+1,直到capacity-1之后再重新到0
 
+int putIndex;
+插入元素的索引,和takeIndex差不多的含义,也是从0开始的
+知道capacity-1
 
+int count;
+数组中元素的总个数
+
+final ReentrantLock lock;
+对于数组的操作都是独占的方式 ,需要使用
+锁进行保护
+
+private final Condition notEmpty;
+获取数据的Condition
+
+private final Condition notFull;
+插入元素的Condition
 
 
 

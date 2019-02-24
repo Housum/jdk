@@ -1,0 +1,334 @@
+LinkedBlockingQueue解读
+
+1.概述
+2.方法
+2.1 插入操作
+2.1.1 add
+2.1.2 offer
+2.1.3 put
+2.1.4 offer(timeout)
+2.2 获取操作
+2.2.1 remove
+2.2.2 poll
+2.2.3 take
+2.2.4 poll(timeout)
+2.3 通用方法
+2.3.1 remainingCapacity
+2.3.2 drainTo*
+3 数据结构
+
+
+
+1.BlockingQueue的实现,采用的是单向链表的实现方式,和ArrayBlockingQueue很大的不同点
+在于可以不指定容量,那么默认的容量就是Integer.MAX_VALUE,在实现上不同点就是和ArrayBlockingQueue在
+读写中都使用同一个锁不同,它将读写的锁进行了分开,吞吐量得到了提升
+
+容量是通过AtomicInteger记录,插入数据和消费数据使用的是两个不同的重入锁,因为这里是使用了AtomicInteger
+而不是像ArrayBlockingQueue一样使用的int,需要使用同一个锁保证线程安全(AtomicInteger本身就是线程安全的,参考
+《concurrent/Atomic*解读》),所以写和读是分开的两个锁,这样的话 有更高的吞吐量. 在插入操作的时候如果已经满了的话
+那么就通过condition的await等待直到有消费元素的操作被唤醒,同理消费操作也类型.
+
+
+2.方法分析
+(1).插入操作
+add:
+同ArrayBlockingQueue使用了offer的能力
+
+offer:
+public boolean offer(E e) {
+        if (e == null) throw new NullPointerException();
+        //这里是使用了一个AtomicInteger记录总数
+        final AtomicInteger count = this.count;
+        if (count.get() == capacity)
+            return false;
+        int c = -1;
+        Node<E> node = new Node<E>(e);
+        //对插入操作使用了putLock 是一个写锁
+        final ReentrantLock putLock = this.putLock;
+        putLock.lock();
+        try {
+            只有当前的数目小于容量的时候 才能插入元素
+            if (count.get() < capacity) {
+                enqueue(node);
+                c = count.getAndIncrement();
+                //插完之后 还有空间的话 那么唤醒那些可能因为
+                //没有空间插入而堵塞的线程. 这里存在这样的一个场景: 就是当前刚开始
+                //插入数据的时候只有一个空间使用了,所以其他的插入线程就堵塞住了,但是当插入的同时也有
+                //其他获取的操作 所以可能还会有空间  所以这里就进行唤醒了
+                if (c + 1 < capacity)
+                    notFull.signal();
+            }
+        } finally {
+            putLock.unlock();
+        }
+        //c=0是获取未插入元素之前的容量,所以当前至少应该为1了
+        if (c == 0)
+            signalNotEmpty();
+        return c >= 0;
+}
+
+put:
+public void put(E e) throws InterruptedException {
+        if (e == null) throw new NullPointerException();
+        int c = -1;
+        Node<E> node = new Node<E>(e);
+        final ReentrantLock putLock = this.putLock;
+        final AtomicInteger count = this.count;
+        putLock.lockInterruptibly();
+        try {
+           //除了这里 其他的基本上和offer的逻辑都是一致的
+           //这里是堵塞直到有空间为止
+            while (count.get() == capacity) {
+                notFull.await();
+            }
+            enqueue(node);
+            c = count.getAndIncrement();
+            if (c + 1 < capacity)
+                notFull.signal();
+        } finally {
+            putLock.unlock();
+        }
+        //同上
+        if (c == 0)
+            signalNotEmpty();
+}
+offer(timeout):
+public boolean offer(E e, long timeout, TimeUnit unit)
+        throws InterruptedException {
+
+        if (e == null) throw new NullPointerException();
+        long nanos = unit.toNanos(timeout);
+        int c = -1;
+        final ReentrantLock putLock = this.putLock;
+        final AtomicInteger count = this.count;
+        putLock.lockInterruptibly();
+        try {
+            //基本上也差不到哪里去 这里多了的逻辑主要就是
+            //当插入失败的话 那么等待一段时间 如果碍事不能插入的话
+            //那么返回false
+            while (count.get() == capacity) {
+                if (nanos <= 0)
+                    return false;
+                nanos = notFull.awaitNanos(nanos);
+            }
+            enqueue(new Node<E>(e));
+            c = count.getAndIncrement();
+            if (c + 1 < capacity)
+                notFull.signal();
+        } finally {
+            putLock.unlock();
+        }
+        if (c == 0)
+            signalNotEmpty();
+        return true;
+}
+插入数据的基础方法 很简单的单向链表添加元素的操作
+private void enqueue(Node<E> node) {
+    // assert putLock.isHeldByCurrentThread();
+    // assert last.next == null;
+    last = last.next = node;
+}
+
+(2).消费数据
+remove:
+使用了poll的能力
+
+poll:
+public E poll() {
+        final AtomicInteger count = this.count;
+        //如果是空的话 直接就返回null 必须要下面那么麻烦的判断
+        if (count.get() == 0)
+            return null;
+        E x = null;
+        int c = -1;
+        //持有获取锁
+        final ReentrantLock takeLock = this.takeLock;
+        takeLock.lock();
+        try {
+            //如果有元素的话 那么就进行获取
+            if (count.get() > 0) {
+                x = dequeue();
+                c = count.getAndDecrement();
+                if (c > 1)
+                    //如果获取了元素之后 还有元素  那么试图唤醒那些因为没有元素而
+                    //堵塞的线程
+                    notEmpty.signal();
+            }
+        } finally {
+            takeLock.unlock();
+        }
+        //如果在获取前容量已经满了 那么在获取了一个元素之后 应该
+        //有空的空间给插入的线程 所以进行唤醒
+        if (c == capacity)
+            signalNotFull();
+        return x;
+}
+
+take:
+public E take() throws InterruptedException {
+        E x;
+        int c = -1;
+        final AtomicInteger count = this.count;
+        final ReentrantLock takeLock = this.takeLock;
+        takeLock.lockInterruptibly();
+        try {
+            //这种情况 就进行堵塞
+            while (count.get() == 0) {
+                notEmpty.await();
+            }
+            x = dequeue();
+            c = count.getAndDecrement();
+            if (c > 1)
+                //获取完元素之后 还有元素 那么试图唤醒其他的因为获取不了元素
+                //而被堵塞的线程
+                notEmpty.signal();
+        } finally {
+            takeLock.unlock();
+        }
+        //在获取之前容量已经满了 那么在获取了一个元素之前  可以尝试的去唤醒那些插入的
+        //操作 尝试插入元素
+        if (c == capacity)
+            signalNotFull();
+        return x;
+}
+
+poll(timeout):
+public E poll(long timeout, TimeUnit unit) throws InterruptedException {
+        E x = null;
+        int c = -1;
+        long nanos = unit.toNanos(timeout);
+        final AtomicInteger count = this.count;
+        final ReentrantLock takeLock = this.takeLock;
+        takeLock.lockInterruptibly();
+        try {
+            //基本上都是类似的 只是这里是堵塞一段时间 如果还是没有
+            //元素获取的话 那么返沪null
+            while (count.get() == 0) {
+                if (nanos <= 0)
+                    return null;
+                nanos = notEmpty.awaitNanos(nanos);
+            }
+            x = dequeue();
+            c = count.getAndDecrement();
+            if (c > 1)
+                notEmpty.signal();
+        } finally {
+            takeLock.unlock();
+        }
+        if (c == capacity)
+            signalNotFull();
+        return x;
+}
+//所有获取方法的基础方法 将head元素弹出 就是简单的
+//单向链表的首节点操作
+private E dequeue() {
+        // assert takeLock.isHeldByCurrentThread();
+        // assert head.item == null;
+        Node<E> h = head;
+        Node<E> first = h.next;
+        h.next = h; // help GC
+        head = first;
+        E x = first.item;
+        first.item = null;
+        return x;
+}
+
+(3).查看元素
+element:
+使用的是peek的能力,如果没有的话 那么抛出异常
+
+peek:
+public E peek() {
+    if (count.get() == 0)
+        return null;
+    final ReentrantLock takeLock = this.takeLock;
+    takeLock.lock();
+    try {
+        //如果首节点有数据的话 那么返回 否则返回null
+        Node<E> first = head.next;
+        if (first == null)
+            return null;
+        else
+            return first.item;
+    } finally {
+        takeLock.unlock();
+    }
+}
+
+(4).其他方法
+remainingCapacity
+这只是一个快照 因为并发的情况
+public int remainingCapacity() {
+    return capacity - count.get();
+}
+
+drainTo*
+
+public int drainTo(Collection<? super E> c, int maxElements) {
+        if (c == null)
+            throw new NullPointerException();
+        if (c == this)
+            throw new IllegalArgumentException();
+        if (maxElements <= 0)
+            return 0;
+        boolean signalNotFull = false;
+        final ReentrantLock takeLock = this.takeLock;
+        takeLock.lock();
+        try {
+            int n = Math.min(maxElements, count.get());
+            // count.get provides visibility to first n Nodes
+            Node<E> h = head;
+            int i = 0;
+            try {
+                while (i < n) {
+                    Node<E> p = h.next;
+                    //遍历链表 获取这些元素
+                    c.add(p.item);
+                    p.item = null;
+                    h.next = h;
+                    h = p;
+                    ++i;
+                }
+                return n;
+            } finally {
+                // Restore invariants even if c.add() threw
+                if (i > 0) {
+                    // assert h.item == null;
+                    head = h;
+                    //这里也是类似take 这里如果返回了获取前已经满了 那么那些插入操作
+                    //肯定是堵塞在插入操作中 那么在获取之后 唤醒那些操作
+                    signalNotFull = (count.getAndAdd(-i) == capacity);
+                }
+            }
+        } finally {
+            takeLock.unlock();
+            if (signalNotFull)
+                signalNotFull();
+        }
+}
+
+(3).数据结构
+private final int capacity;
+整个堵塞队列的容量 final的！
+
+private final AtomicInteger count = new AtomicInteger();
+当前的数量 这里使用了AtomicInteger十分的巧妙,这样在读写的时候就不需要
+使用同一个锁进行操作了,而可以分开两个锁进行操作
+
+transient Node<E> head;
+链表的首节点,第一个被返回的
+
+private transient Node<E> last;
+最后一个元素
+
+private final ReentrantLock takeLock = new ReentrantLock();
+获取操作的锁
+
+private final Condition notEmpty = takeLock.newCondition();
+对于队列容量已经满了的时候的等待
+
+private final ReentrantLock putLock = new ReentrantLock();
+插入操作的锁
+
+private final Condition notFull = putLock.newCondition();
+对于队列已经空了的时候的等待
