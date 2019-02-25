@@ -1,0 +1,220 @@
+PriorityBlockingQueue解读
+
+1.概述
+2.数据结构
+3.方法分析
+
+1.首先第一点它是堵塞队列,详情见《BlockingQueue》,然后它是优先级的队列,实现的方式和优先级队列PriorityQueue
+的实现方式是相同的.
+
+实现方式和其他的BlockingQueue类似,都是在插入和弹出数据的时候进行加锁,在没有数据和数据满了之后进行
+堵塞直到条件满足之后才能够被唤醒
+
+二叉堆的容量是无限的(最大为Integer.MAX_VALUE)
+
+2.数据结构
+private transient Object[] queue;
+储存元素的数组
+
+private transient int size;
+元素的个数
+
+private transient Comparator<? super E> comparator;
+比较器 在构造器中传入
+
+private final ReentrantLock lock;
+冲入锁 在读写的时候进行加锁 防止并发问题
+
+private final Condition notEmpty;
+当获取操作的时候发现没有元素的话 那么堵塞在获取操作中
+直到有插入操作的时候才进行对堵塞的线程进行唤醒.如果比较的话那么
+就发现这里没有notFull状态,这是因为优先队列本身就是无限大的
+
+private transient volatile int allocationSpinLock;
+这个字段只有0和1两个值 通过CAS操作 当为0的时候 是为了扩容的时候
+进行的控制字段,为0的时候表示的是没有线程对数组就行扩容,如果等于1的时候
+那么说明有线程正在对其进行扩容
+
+private PriorityQueue<E> q;
+这个类的作用是为了序列化和凡序列化使用的
+
+3.方法的分析
+对于优先级队列来说,因为容量是无限大的,所以对于插入操作来说是不会堵塞的,所以对于BlockingQueue的操作操作
+来说可以统一使用offer的能力
+offer:
+public boolean offer(E e) {
+        if (e == null)
+            throw new NullPointerException();
+        final ReentrantLock lock = this.lock;
+        lock.lock();
+        int n, cap;
+        Object[] array;
+        //如果容量已经不够了 那么进行扩容 具体的扩容逻辑后面分析
+        while ((n = size) >= (cap = (array = queue).length))
+            tryGrow(array, cap);
+        try {
+            //这里和PriorityQueue相同 详情见《PriorityQueue解读》
+            Comparator<? super E> cmp = comparator;
+            if (cmp == null)
+                siftUpComparable(n, e, array);
+            else
+                siftUpUsingComparator(n, e, array, cmp);
+            size = n + 1;
+            //对于那些因为没有数据而堵塞的获取操作 进行唤醒
+            notEmpty.signal();
+        } finally {
+            lock.unlock();
+        }
+        return true;
+}
+//扩容操作
+private void tryGrow(Object[] array, int oldCap) {
+        //因为前面获取了锁 所以这里进行释放
+        lock.unlock(); // must release and then re-acquire main lock
+        Object[] newArray = null;
+        //这里采用CAS的方式进行锁的竞争
+        if (allocationSpinLock == 0 &&
+            UNSAFE.compareAndSwapInt(this, allocationSpinLockOffset,
+                                     0, 1)) {
+
+            //进行扩容操作 和其他的集合框架类似
+            try {
+                int newCap = oldCap + ((oldCap < 64) ?
+                                       (oldCap + 2) : // grow faster if small
+                                       (oldCap >> 1));
+                if (newCap - MAX_ARRAY_SIZE > 0) {    // possible overflow
+                    int minCap = oldCap + 1;
+                    if (minCap < 0 || minCap > MAX_ARRAY_SIZE)
+                        throw new OutOfMemoryError();
+                    newCap = MAX_ARRAY_SIZE;
+                }
+                if (newCap > oldCap && queue == array)
+                    newArray = new Object[newCap];
+            } finally {
+                allocationSpinLock = 0;
+            }
+        }
+
+        //如果没有获取到锁 那么稍等一会 等待其他的线程进行扩容
+        if (newArray == null) // back off if another thread is allocating
+            Thread.yield();
+        lock.lock();
+        //如果本线程扩容成功 那么将元素拷贝到新的数组中
+        if (newArray != null && queue == array) {
+            queue = newArray;
+            System.arraycopy(array, 0, newArray, 0, oldCap);
+        }
+}
+
+获取操作:
+remove:
+使用的是poll的能力
+
+take:
+public E take() throws InterruptedException {
+    final ReentrantLock lock = this.lock;
+    lock.lockInterruptibly();
+    E result;
+    try {
+        //如果没有数据的话 那么堵塞 直到有数据被插入进来然后被唤醒
+        while ( (result = dequeue()) == null)
+            notEmpty.await();
+    } finally {
+        lock.unlock();
+    }
+    return result;
+}
+poll:
+public E poll() {
+    final ReentrantLock lock = this.lock;
+    //除了加锁之外 没有其他的操作
+    lock.lock();
+    try {
+        return dequeue();
+    } finally {
+        lock.unlock();
+    }
+}
+poll(timeout)
+public E poll(long timeout, TimeUnit unit) throws InterruptedException {
+    long nanos = unit.toNanos(timeout);
+    final ReentrantLock lock = this.lock;
+    lock.lockInterruptibly();
+    E result;
+    try {
+        // 如果获取不了数据 那么等待一段时间
+        while ( (result = dequeue()) == null && nanos > 0)
+            nanos = notEmpty.awaitNanos(nanos);
+    } finally {
+        lock.unlock();
+    }
+    return result;
+}
+弹出元素，主要的操作:
+private E dequeue() {
+        int n = size - 1;
+        if (n < 0)
+            return null;
+        else {
+            Object[] array = queue;
+            //返回arr[0]
+            E result = (E) array[0];
+            E x = (E) array[n];
+            array[n] = null;
+            //将arr[0] = arr[n] 然后见arr[0]
+            //下沉 具体见《PriorityQueue解读》
+            Comparator<? super E> cmp = comparator;
+            if (cmp == null)
+                siftDownComparable(0, x, array, n);
+            else
+                siftDownUsingComparator(0, x, array, n, cmp);
+            size = n;
+            return result;
+        }
+}
+
+检查元素:
+peek:
+public E peek() {
+    final ReentrantLock lock = this.lock;
+    lock.lock();
+    try {
+    //返回首元素
+        return (size == 0) ? null : (E) queue[0];
+    } finally {
+        lock.unlock();
+    }
+}
+element:
+使用了peek的能力
+
+
+通用方法:
+drainTo*
+public int drainTo(Collection<? super E> c, int maxElements) {
+    if (c == null)
+        throw new NullPointerException();
+    if (c == this)
+        throw new IllegalArgumentException();
+    if (maxElements <= 0)
+        return 0;
+    final ReentrantLock lock = this.lock;
+    lock.lock();
+    try {
+        int n = Math.min(size, maxElements);
+        //遍历二叉堆 将堆元素都插入到集合中
+        for (int i = 0; i < n; i++) {
+            c.add((E) queue[0]); // In this order, in case add() throws.
+            dequeue();
+        }
+        return n;
+    } finally {
+        lock.unlock();
+    }
+}
+remainingCapacity:
+public int remainingCapacity() {
+    return Integer.MAX_VALUE;
+}
+
+

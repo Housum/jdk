@@ -1,5 +1,10 @@
 PriorityQueue解读
 
+
+
+二叉堆参考：具体参考： 《算法 2.4》
+
+
 1.实现了Queue接口,实现了所有的队列的方法,根据类名知道这是优先级队列,队列的优先级
 有两种指定的方式,一种是所有的元素必须是实现了Comparable接口,另外一种是在构造函数中
 传入使用的Comparator. 优先级队列底层实现的数据结构是二叉堆(小堆的方式)
@@ -126,6 +131,16 @@ private void siftDownComparable(int k, E x) {
     queue[k] = key;
 }
 
+4.数据结构
+transient Object[] queue;
+储存元素的数组 从0开始储存
 
+private int size = 0;
+元素的个数
 
-具体参考： 《算法 2.4》
+private final Comparator<? super E> comparator;
+比较器
+
+transient int modCount = 0;
+快速失败的计数器 和其他的集合框架一样
+
