@@ -6,12 +6,126 @@ PriorityQueue解读
 非线程安全
 
 2.二叉堆
-(1).数据结构是一个完全二叉树的结构,但是通过数组的方式实现 父节点为:k-1 左节点:K 右节点: K+1
+(1).数据结构是一个完全二叉树的结构,但是通过数组的方式实现 节点为k 那么满足 父节点为:2/(k-1) 左节点:2k+1 右节点: 2k+2
+它们在数组中的索引位置
 (2).
-最大堆： k-1 >= k && k-1 >= k+1
-最小堆： k-1 <= k && k-1 <= k+1
+大堆:就是父节点不小于左右两个子节点,满足 arr[k] >= arr[2k+1] && arr[k] >= arr[2k+2]
+小堆:就是父节点不大于左右两个子节点,满足 arr[k] <= arr[2k+1] && arr[k] <= arr[2k+2]
+(3).
+插入:
+当插入一个大于父节点的元素,那么就需要进行上浮了
+将arr[n]设置为插入元素,并且将元素进行上浮,使其满足上面的定义2.2的定义
+(4).
+删除: 删除arr[0]元素,并且将arr[n]元素赋值给arr[0],并且进行下沉,使其满足2.2的定义
 
-插入: 将n 设置为插入元素,并且将元素进行上浮,使其满足上面的定义
-删除: 删除0元素,并且将n元素赋值给0,并且进行下沉,使其满足上面的定义
+3.有序堆在PriorityQueue中的实践
+在优先级队列中使用的是最小堆的方式.
+
+插入元素:
+public boolean offer(E e) {
+        if (e == null)
+            throw new NullPointerException();
+        modCount++;
+        int i = size;
+        if (i >= queue.length)
+            //如果数组不够的话 那么进行扩容 跟其他基于数组实现的集合一样 这里是扩大50%
+            //这里不做其他的分析
+            grow(i + 1);
+        size = i + 1;
+        if (i == 0)
+            //如果是空的情况 那么将arr[0]设置为初值
+            queue[0] = e;
+        else
+            //这里将arr[n]设置为e,并且上浮
+            siftUp(i, e);
+        return true;
+}
+上浮操作:
+private void siftUp(int k, E x) {
+    //采用不同的方式 如果构造函数提供了comparator 那么优化
+    //使用比较器
+    if (comparator != null)
+        siftUpUsingComparator(k, x);
+    else
+        siftUpComparable(k, x);
+}
+private void siftUpComparable(int k, E x) {
+    Comparable<? super E> key = (Comparable<? super E>) x;
+    //这里k>0 是为了不让它超过根节点的索引位置
+    while (k > 0) {
+        //根节点为 2/(k-1)
+        int parent = (k - 1) >>> 1;
+        Object e = queue[parent];
+        //1.将父节点和当前的节点比较大小 如果当前的节点
+        //小于父节点的话 那么需要将父节点设置为当前节点的值并且将
+        //当前节点的值设置为父节点的值(也就是将两个节点的位置交换一下)
+        //2.如果当前节点预已经大于父节点,已经满足小根堆的定义了,那么就不需要
+        //上浮了
+        if (key.compareTo((E) e) >= 0)
+            break;
+        //这一笔就是将父节点位置的值设置为子节点的值
+        queue[k] = e;
+        //将父节点赋值给k,因为子节点已经到了父节点的位置parent上了,所以需要
+        //判断是否将parent位置上的子节点再次上浮
+        k = parent;
+    }
+    //这一步就是将子节点的值设置为被替换下来的父节点的值
+    queue[k] = key;
+}
+弹出数据:
+public E poll() {
+    if (size == 0)
+        return null;
+    int s = --size;
+    modCount++;
+    //返回最上面的元素
+    E result = (E) queue[0];
+    //将最后面的元素赋值给0位置的元素,然后将0位置的元素进行下沉直到
+    //满足小堆的定义
+    E x = (E) queue[s];
+    queue[s] = null;
+    if (s != 0)
+        siftDown(0, x);
+    return result;
+}
+private void siftDown(int k, E x) {
+    //如果定义了比较器 那么优先使用比较器
+    if (comparator != null)
+        siftDownUsingComparator(k, x);
+    else
+        siftDownComparable(k, x);
+}
+private void siftDownComparable(int k, E x) {
+    Comparable<? super E> key = (Comparable<? super E>)x;
+    int half = size >>> 1;        // loop while a non-leaf
+    //因为二叉堆是完全二叉树 所以当前索引大于2/k的都是非叶子节点
+    while (k < half) {
+        //左节点 2k+1 先试图取左节点数据 然后在比对左右节点的
+        //大小 将更小的那个和父节点进行替换
+        int child = (k << 1) + 1; // assume left child is least
+        Object c = queue[child];
+        //右节点 2k +2
+        int right = child + 1;
+
+        //这个判断是为了左右节点 那么节点更小 如果右节点更小的话 那么child = right
+        if (right < size &&
+            ((Comparable<? super E>) c).compareTo((E) queue[right]) > 0)
+            c = queue[child = right];
+
+            //1.将父节点和子节点进行比较 如果父节点大于两个子节点的话 那么需要父
+            //节点进行下沉
+
+            //2.如果父节点已经小于两个节点中较小的那个的话 那么就不需要进行下沉了
+        if (key.compareTo((E) c) <= 0)
+            break;
+        //将子节点设置为了父节点位置上的元素
+        queue[k] = c;
+        k = child;
+    }
+    //将父节点给下沉了
+    queue[k] = key;
+}
+
+
 
 具体参考： 《算法 2.4》
