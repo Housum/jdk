@@ -247,12 +247,30 @@ public class JDKTest<K extends Object & Map, V> implements Serializable {
 
 //        testScheduleExecutorServiceFixRate();
 
-        testScheduleExecutorServiceFixDelayed();
+//        testScheduleExecutorServiceFixDelayed();
+
+        testInputStreamMarkAndReset();
     }
 
 
     private static int RESIZE_STAMP_BITS = 16;
 
+
+
+    public static void testInputStreamMarkAndReset(){
+
+        ByteArrayInputStream inputStream = new ByteArrayInputStream("123456789".getBytes());
+        log((char)inputStream.read());
+        log((char)inputStream.read());
+        inputStream.mark(1);
+        log((char)inputStream.read());
+        log((char)inputStream.read());
+        log((char)inputStream.read());
+        inputStream.reset();
+        log((char)inputStream.read());
+        log((char)inputStream.read());
+        log((char)inputStream.read());
+    }
 
     public static void testScheduleExecutorServiceFixRate() throws Exception {
 

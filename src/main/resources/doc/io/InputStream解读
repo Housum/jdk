@@ -1,0 +1,91 @@
+InputStream解读
+
+1.代表了一切的输入流,是一个抽象类
+
+2.类常量
+private static final int MAX_SKIP_BUFFER_SIZE = 2048;
+表示在skip方法中每次最大能够跳跃的字节数,并不是说只能跳跃那么多,而是说底层实现的时候每次
+跳跃的字节数,可能一个很大的时候 分为多次实现
+
+3.方法:
+抽象方法 子类需要实现的方法 返回流的下一个字节. 如果没有字节的话 那么返回-1
+这个方法会被堵塞直到有数据被获取
+public abstract int read() throws IOException;
+
+读取多个字节 返回的int就是每次读取的大小 如果返回-1那么表示的是已经读完了
+被读取的字节保存在byte[0] - byte[returnInt] 中
+public int read(byte b[]) throws IOException {
+    return read(b, 0, b.length);
+}
+
+//从流中读取len个字节到b[]中,从b[off]开始储存. 返回的int表示的是读取的字节数
+如果返回-1 表示已经读取完成
+public int read(byte b[], int off, int len) throws IOException {
+        if (b == null) {
+            throw new NullPointerException();
+        } else if (off < 0 || len < 0 || len > b.length - off) {
+            throw new IndexOutOfBoundsException();
+        } else if (len == 0) {
+            return 0;
+        }
+        // 这里是为了判断流是否以ing被读取完了
+        int c = read();
+        if (c == -1) {
+            return -1;
+        }
+        b[off] = (byte)c;
+        int i = 1;
+        try {
+            for (; i < len ; i++) {
+                //重复的读取
+                c = read();
+                if (c == -1) {
+                    break;
+                }
+                b[off + i] = (byte)c;
+            }
+        } catch (IOException ee) {
+        }
+        return i;
+}
+
+//该方法是跳过多少个字节
+public long skip(long n) throws IOException {
+        long remaining = n;
+        int nr;
+
+        if (n <= 0) {
+            return 0;
+        }
+        //详情参考上面的MAX_SKIP_BUFFER_SIZE
+        int size = (int)Math.min(MAX_SKIP_BUFFER_SIZE, remaining);
+        byte[] skipBuffer = new byte[size];
+        while (remaining > 0) {
+            nr = read(skipBuffer, 0, (int)Math.min(size, remaining));
+            if (nr < 0) {
+                break;
+            }
+            remaining -= nr;
+        }
+        return n - remaining;
+}
+
+返回一个大概的字节总数 可能是全部的 也可能是部分的 看具体的实现
+public int available() throws IOException {
+    return 0;
+}
+
+关闭流操作 具有AutoClose的作用 1.7中的语法糖
+public void close() throws IOException {}
+
+标记当前的位置 之后可以通过reset返回原来的位置重新读取
+readlimit表示的是最大范围 如果距离mark的位置已经超过了readlimit 那么有可能
+mark就是失效了(但是还是需要根据不同的子类)
+提供了markSupported 判断是否支持mark方法
+public synchronized void mark(int readlimit) {}
+
+reset到mark位置的方法是 默认是不支持的
+public synchronized void reset() throws IOException {
+    throw new IOException("mark/reset not supported");
+}
+
