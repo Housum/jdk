@@ -1,0 +1,13 @@
+Reader解读
+
+1. 和字节数输入流类似,也是打开一个输入的进行读取.主要的区别就是Reader读取的是字符流
+子类只需要实现read(char[], int, int) 和 close()  这两个方法
+
+2.方法分析:
+和InputStream类似,具体只分析:read(char[], int, int)
+
+abstract public int read(char cbuf[], int off, int len) throws IOException;
+重输入流中获取字符流 放入cbuff[off] 直到有len个字符
+
+
+
