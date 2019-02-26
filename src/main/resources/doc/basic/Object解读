@@ -1,0 +1,43 @@
+Object解读
+
+1.对象是类概念上的一个集合. 详情见《Class解读》. 除了自身之外所有的对象都继承
+于Object类,即使是数组也继承于它.
+
+2.方法分析
+下面的这些方法,所有的JAVA类都存在这些方法
+
+(1).public final native Class<?> getClass();
+返回对象所属的类
+
+(2).public native int hashCode();
+对象的hash码.对象的hashCode有如下的约束:
+具有持久性,无论在哪里或者什么时候调用hashCode都必须都返回同一个
+当两个对象使用equal方法相等的时候 那么他们两必须返回相同的hashCode
+当两个对象不相等的时候,那么他们的hashCode有可能相等的(有可能出现hash冲突)
+
+(3).public boolean equals(Object obj) {
+    return (this == obj);
+}
+判断两个对象是否相等.
+对于对象的equal方法,有如下的约束
+自等:就是对于非null的对象和自己是相等的
+对等性: 如果 x.equal(y)等于true 那么 y.equal(x) 等于true
+传递性: 如果 x.equal(y)等于true , y.equal(z) 等于true 那么x.equal(z)等于true
+持久性: 如果 x.equal(y)等于true ,那么无论什么时候 都是相等的
+
+(4).protected native Object clone() throws CloneNotSupportedException;
+clone对象 需要注意的是如果需要使用该特性 那么需要实现Cloneable,如果父类也是可拷贝的
+话那么在内部使用super.clone(); 使用参考:java.util.ArrayList.clone
+
+(5).notify*
+唤醒线程
+notify是唤醒其中的一个被堵塞在wait的线程
+notifyAll是唤醒全部被堵塞在在wait的线程
+
+(6).wait*
+堵塞直到该对象调用notify或者notifyAll
+5.6 可以参考《concurrent/AbstractQueuedSynchronizer解读》中的Condition
+是类似的功能
+
+(7).toString
+打印对象的字符表现形式
