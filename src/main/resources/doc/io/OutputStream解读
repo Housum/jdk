@@ -1,0 +1,33 @@
+OutputStream解读
+
+1.代表了一切的输出流,将流给输出到特定的管道,比如文件,Socket等等
+
+2.方法分析：
+
+写入一个字节 int的高24位将会被忽略
+这是一个堵塞的接口  一直堵塞直到能够写入数据为止
+public abstract void write(int b) throws IOException
+
+向输出流写入字节数组
+public void write(byte b[]) throws IOException {
+    write(b, 0, b.length);
+}
+
+将字节数组的字节写入到输出流中 从b[off] 开始 直到len个字节
+public void write(byte b[], int off, int len) throws IOException {
+    if (b == null) {
+        throw new NullPointerException();
+    } else if ((off < 0) || (off > b.length) || (len < 0) ||
+               ((off + len) > b.length) || ((off + len) < 0)) {
+        throw new IndexOutOfBoundsException();
+    } else if (len == 0) {
+        return;
+    }
+    for (int i = 0 ; i < len ; i++) {
+        write(b[off + i]);
+    }
+}
+
+将字节流刷新到输入流中 
+public void flush() throws IOException {
+}
