@@ -1,1 +1,118 @@
 Buffer解读
+
+
+1.Buffer是NIO中数据流储存的媒介,其中储存的都是基本类型,所以子类都是比如:ByteBuffer,ShortBuffer,IntBuffer等等
+Buffer可以向其中加入数据也可以储存数据,使用的流程都是: 通过put写入数据,通过flip切换模式,再通过read读出数据,最后通过
+clear清理数据,再通过put写入数据,重复以上的过程
+Buffer的设计是Fluent的:https://www.thankjava.com/java/eff1da76beda47a9b4b5862213c80226
+
+在Buffer中有三个很重要的属性,分别是position,limit,capacity. 这三个属性的之间的来回变换支撑了读写模式
+的切换.
+position,limit,capacity三者的关系:
+在写模式中
+position被初始化为0 代表的是当前开始写入的位置
+limit = capacity 表示的是当前可以写入的字节数目 当然在写的时候也可以自己通过limit设置方法设置limit
+在模式中
+position被初始化为0 代表的是当前开始读取数据的位置
+limit 代表的是能够读取的位置,当写完之后切读模式的时候 limit就等于写的position
+
+数据的以移动方法
+有两种方式 一种是相对的 就是我们不控制我们获取的位置.第二种是我们可以控制我们读或者写的position位置
+比如get() put(byte) 这就是我们不控制位置的 比如get(index) put(index,byte)这种就是我们可以控制获取的
+位置的
+
+mark和reset方法
+无论在读或者写的地方 都可以使用
+mark就是标记当前的position的位置,在之后通过reset到mark的位置 可以实现
+重复读取某一块数据或者覆盖某一块数据
+
+
+clear flip rewind 方法
+clear方法就是将整个缓存中位置都重置为写的初始化状态(position,limit,capacity)待数据写入
+flip将写模式切换为读模式 底层就是将limit 设置为position 并且将position设置为0
+rewind将position设置为0 可以在读模式中重新开始读数据 或者写模式中重新开始写数据
+
+2.方法实现
+(1).设置limit
+public final Buffer limit(int newLimit) {
+        if ((newLimit > capacity) || (newLimit < 0))
+            throw new IllegalArgumentException();
+        limit = newLimit;
+        //position 是小于limit的 无论是读模式还是写模式
+        if (position > limit) position = limit;
+        //如果当前的mark大于limit 那么设置为失效
+        if (mark > limit) mark = -1;
+        return this;
+}
+(2).设置mark
+public final Buffer mark() {
+    //标记当前的position
+    mark = position;
+    return this;
+}
+(3).设置reset
+public final Buffer reset() {
+    int m = mark;
+    if (m < 0)
+        throw new InvalidMarkException();
+    //将position设置为之前mark过的
+    position = m;
+    return this;
+}
+(4).clear
+public final Buffer clear() {
+        //将所有的属性都设置为写模式的初始化状态 详细参考前面的
+        //写模式的约束
+        position = 0;
+        limit = capacity;
+        mark = -1;
+        return this;
+}
+(5).flip
+public final Buffer flip() {
+    //切换为读模式之后 因为前面只写到了position这个位置
+    //那么只能读到position
+    limit = position;
+    position = 0;
+    mark = -1;
+    return this;
+}
+(6).rewind
+public final Buffer rewind() {
+
+   // 只是将position设置为了0 有两种用法 在写模式下 可以丢弃的数据
+   // 在读模式下 就可以重新读取数据
+    position = 0;
+    mark = -1;
+    return this;
+}
+其他方法:
+剩下剩下多少空间 写模式: 还剩下多少空间可以写入
+读模式: 还剩下多少可以读取
+public final int remaining() {
+    return limit - position;
+}
+是否还剩下空间
+public final boolean hasRemaining() {
+    return position < limit;
+}
+
+
+3. 抽象方法
+
+这个Buffer是否只读
+public abstract boolean isReadOnly();
+
+如果这个Buffer是基于数组
+public abstract boolean hasArray();
+
+如果该Buffer是基于数据的话 那么返回这个数组 而且返回的数组是Buffer中的一个视图
+双方的修改是互相影响的
+public abstract Object array();
+
+如果Buffer基于数组实现的 那么返回数组的起始位置
+public abstract int arrayOffset();
+
+Buffer的实现是基于直接底层内存的 如果是基于堆的话 那么返回false
+public abstract boolean isDirect();
+

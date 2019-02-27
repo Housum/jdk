@@ -8,6 +8,7 @@ import java.lang.ref.Reference;
 import java.lang.ref.ReferenceQueue;
 import java.lang.reflect.*;
 import java.net.URL;
+import java.nio.ByteBuffer;
 import java.security.AccessController;
 import java.security.ProtectionDomain;
 import java.text.Collator;
@@ -249,7 +250,9 @@ public class JDKTest<K extends Object & Map, V> implements Serializable {
 
 //        testScheduleExecutorServiceFixDelayed();
 
-        testInputStreamMarkAndReset();
+//        testInputStreamMarkAndReset();
+
+        testBufferMarkAndResetInWriteMode();
     }
 
 
@@ -271,6 +274,37 @@ public class JDKTest<K extends Object & Map, V> implements Serializable {
         log((char)inputStream.read());
         log((char)inputStream.read());
     }
+
+
+    public static void testBufferMarkAndResetInWriteMode(){
+
+        /*
+        * =================================
+            3
+            =================================
+            4
+            =================================
+            5
+        *
+        * */
+        ByteBuffer byteBuffer = ByteBuffer.allocate(6);
+        byteBuffer.mark();
+        byteBuffer.put((byte) 0);
+        byteBuffer.put((byte) 1);
+        byteBuffer.put((byte) 2);
+        byteBuffer.reset();
+        byteBuffer.put((byte) 3);
+        byteBuffer.put((byte) 4);
+        byteBuffer.put((byte) 5);
+
+        byteBuffer.flip();
+        while (byteBuffer.hasRemaining()){
+            log(byteBuffer.get());
+        }
+
+
+    }
+
 
     public static void testScheduleExecutorServiceFixRate() throws Exception {
 

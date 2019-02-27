@@ -4,9 +4,14 @@ Channel解读
 一种是打开,一种是关闭. 当Channel被创建的时候为打开. 当Channel被关闭的时候那么
 试图进行IO操作会抛出ClosedChannelException异常
 
+
 2.接口方法定义:
 public boolean isOpen()
 判断是否打开
 
 public void close() throws IOException
 关闭通道,一旦关闭的话 那么所有的IO操作都将失败,支持 try resource语法糖
+
+
+3.文档:
+http://ifeve.com/channels/
