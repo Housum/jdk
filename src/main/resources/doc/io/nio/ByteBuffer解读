@@ -1,0 +1,84 @@
+ByteBuffer解读
+
+1. ByteBuffer 字节的Buffer,主要是对字节流的操作,除了Buffer中提到的功能之外,还提供了很多的其他
+方法,主要有批量操作字节数组;对其他的基本类型进行操作;将字节数组包装成ByteBuffer;与其他的基本类型的
+Buffer进行转换;分配ByteBuffer(不提供构造方法)
+
+ByteBuffer依旧是一个抽象类,通过构造方法提供了不同类型的ByteBuffer,一种是基于堆内存的,一种是直接分配
+物理内存的(通过Unsafe). 具体的方法为:ByteBuffer.allocate 以及 ByteBuffer.allocateDirect
+
+基于堆实现的ByteBuffer:HeapByteBuffer
+是包可见的,只有通过ByteBuffer.allocate能够分配,底层实现是通过预先分配一块堆内存的方式实现的
+对于所有的方法也是通过对字节数组进行操作实现的,大部分都是靠的System.arraycopy实现的,比如：
+获取字节数组的方法
+public ByteBuffer get(byte[] dst, int offset, int length) {
+    checkBounds(offset, length, dst.length);
+    if (length > remaining())
+        throw new BufferUnderflowException();
+    //这里是将数组中的数组拷贝到dest中
+    System.arraycopy(hb, ix(position()), dst, offset, length);
+    position(position() + length);
+    return this;
+}
+其他方法也是类似
+
+基于直接内存实现的ByteBuffer:DirectByteBuffer
+是包可见的,只有通过ByteBuffer.allocateDirect能够分配,底层是通过Unsafe预先分配一个操作系统底层的
+内存块,这个内存块不属于JMM,不会被GC回收,需要通过Unsafe进行回收. 其他的比如获取等等操作也是通过Unsafe进行的
+Unsafe: http://mishadoff.com/blog/java-magic-part-4-sun-dot-misc-dot-unsafe/
+对于回收这部分是通过分配了一个Cleaner进行回收的,Cleaner在垃圾回收的时候会被判断,如果是Cleaner的话 那么直接调用其
+clean方法,具体调用处可以见Reference:
+java.lang.ref.Reference.tryHandlePending方法,对象回收的时候判断,具体:
+if (c != null) {
+    c.clean();
+    return true;
+}
+
+Cleaner在DirectByteBuffer中属于一个属性,初始化的时候进行分配:
+cleaner = Cleaner.create(this, new Deallocator(base, size, cap));
+Deallocator代码进行内存块的回收:
+public void run() {
+    if (address == 0) {
+        // Paranoia
+        return;
+    }
+    //address为内存地址 这里是释放这个地址的内存块
+    unsafe.freeMemory(address);
+    address = 0;
+    Bits.unreserveMemory(size, capacity);
+}
+
+对于内存的操作比如:
+public ByteBuffer put(byte x) {
+    unsafe.putByte(ix(nextPutIndex()), ((x)));
+    return this;
+}
+ix:
+private long ix(int i) {
+    //获取当前物理地址
+    return address + ((long)i << 0);
+}
+
+2.方法分析:
+非Buffer中提到的方法
+
+public abstract ByteBuffer compact()
+该方法是丢弃已经读完的数据 将未读的那部分数据拷贝到起始位置
+
+ByteBuffer wrap(byte[] array,int offset, int length)
+将字节数组包装成一个ByteBuffer
+
+get*  *为其他的基本类型 char short int long float double
+获取其他基本类型的数据
+
+put* *为其他的基本类型 char short int long float double
+储存其他的基本类型
+
+slice
+从原有的ByteBuffer上面部分试图切割出来,切割出来的数据和之前的数据
+是共有一个底层内存的,所以是相互影响的. 切割的部分的position为0,
+limit 和 capacity为之前的remaining
+
+duplicate
+复制之前的ByteBuffer视图,内存块的修改是相互影响的. 新的position,limit,capacity
+都和之前的相同
