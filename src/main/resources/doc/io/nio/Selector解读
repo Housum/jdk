@@ -1,0 +1,12 @@
+Selector解读
+
+1.NIO中的多路服用器,其中的一个能够Selector能够处理多个连接,这也是NIO中的精髓
+通过open方法创建或者通过SelectorProvider的provider()方法进行创建
+
+SelectableChannel通过register方法将连接以及连接感兴趣的事件注册到selector上面
+并且返回SelectionKey代表了一个注册事件. 对于所有的SelectionKey都保存在了其中的一个
+set key中.对于已经触发了注册感兴趣的事件 会返回selected-key set,对于保存在其中的
+SelectionKey只有通过这个set进行删除.
+
+2.方法定义
+TODO

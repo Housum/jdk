@@ -7,8 +7,10 @@ import java.lang.ref.PhantomReference;
 import java.lang.ref.Reference;
 import java.lang.ref.ReferenceQueue;
 import java.lang.reflect.*;
+import java.net.InetSocketAddress;
 import java.net.URL;
 import java.nio.ByteBuffer;
+import java.nio.channels.*;
 import java.security.AccessController;
 import java.security.ProtectionDomain;
 import java.text.Collator;
@@ -252,31 +254,56 @@ public class JDKTest<K extends Object & Map, V> implements Serializable {
 
 //        testInputStreamMarkAndReset();
 
-        testBufferMarkAndResetInWriteMode();
+//        testBufferMarkAndResetInWriteMode();
+
+        testServiceSocketChannel();
     }
 
 
     private static int RESIZE_STAMP_BITS = 16;
 
 
+    public static void testServiceSocketChannel() throws Exception {
 
-    public static void testInputStreamMarkAndReset(){
+        ServerSocketChannel socketChannel = ServerSocketChannel.open();
+        socketChannel.bind(new InetSocketAddress(8082));
+
+        Selector selector = Selector.open();
+        socketChannel.configureBlocking(false);
+        socketChannel.register(selector, SelectionKey.OP_ACCEPT);
+
+        while (true) {
+            int i = selector.select();
+            if (i != 0) {
+                Iterator<SelectionKey> selectionKeyIterator = selector.selectedKeys().iterator();
+                while (selectionKeyIterator.hasNext()) {
+                    SelectionKey selectionKey = selectionKeyIterator.next();
+                    if (selectionKey.isAcceptable()){
+                        log("finished");
+                    }
+                    selectionKeyIterator.remove();
+                }
+            }
+        }
+    }
+
+    public static void testInputStreamMarkAndReset() {
 
         ByteArrayInputStream inputStream = new ByteArrayInputStream("123456789".getBytes());
-        log((char)inputStream.read());
-        log((char)inputStream.read());
+        log((char) inputStream.read());
+        log((char) inputStream.read());
         inputStream.mark(1);
-        log((char)inputStream.read());
-        log((char)inputStream.read());
-        log((char)inputStream.read());
+        log((char) inputStream.read());
+        log((char) inputStream.read());
+        log((char) inputStream.read());
         inputStream.reset();
-        log((char)inputStream.read());
-        log((char)inputStream.read());
-        log((char)inputStream.read());
+        log((char) inputStream.read());
+        log((char) inputStream.read());
+        log((char) inputStream.read());
     }
 
 
-    public static void testBufferMarkAndResetInWriteMode(){
+    public static void testBufferMarkAndResetInWriteMode() {
 
         /*
         * =================================
@@ -298,7 +325,7 @@ public class JDKTest<K extends Object & Map, V> implements Serializable {
         byteBuffer.put((byte) 5);
 
         byteBuffer.flip();
-        while (byteBuffer.hasRemaining()){
+        while (byteBuffer.hasRemaining()) {
             log(byteBuffer.get());
         }
 

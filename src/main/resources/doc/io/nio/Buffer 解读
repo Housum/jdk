@@ -1,5 +1,11 @@
 Buffer解读
 
+1.概述
+2.方法实现
+3.抽象方法
+4.子类
+
+
 
 1.Buffer是NIO中数据流储存的媒介,其中储存的都是基本类型,所以子类都是比如:ByteBuffer,ShortBuffer,IntBuffer等等
 Buffer可以向其中加入数据也可以储存数据,使用的流程都是: 通过put写入数据,通过flip切换模式,再通过read读出数据,最后通过
@@ -99,7 +105,6 @@ public final boolean hasRemaining() {
 
 
 3. 抽象方法
-
 这个Buffer是否只读
 public abstract boolean isReadOnly();
 
@@ -116,3 +121,15 @@ public abstract int arrayOffset();
 Buffer的实现是基于直接底层内存的 如果是基于堆的话 那么返回false
 public abstract boolean isDirect();
 
+
+4.子类
+子类都为基本类型的Buffer:
+ByteBuffer
+CharBuffer
+ShortBuffer
+IntBuffer
+LongBuffer
+FloatBuffer
+DoubleBuffer
+具体参考《ByteBuffer解读》其他的实现都差不多,其中只有ByteBuffer支持两种方式的内存
+分配, 其他的都不支持直接内存分配的方式
