@@ -1,12 +1,53 @@
 Selector解读
 
-1.NIO中的多路服用器,其中的一个能够Selector能够处理多个连接,这也是NIO中的精髓
-通过open方法创建或者通过SelectorProvider的provider()方法进行创建
+1.NIO中的多路复用器,其中一个能够Selector能够处理多个连接,这也是NIO中的精髓
+通过open方法或者通过SelectorProvider的provider()方法进行创建
 
 SelectableChannel通过register方法将连接以及连接感兴趣的事件注册到selector上面
-并且返回SelectionKey代表了一个注册事件. 对于所有的SelectionKey都保存在了其中的一个
-set key中.对于已经触发了注册感兴趣的事件 会返回selected-key set,对于保存在其中的
-SelectionKey只有通过这个set进行删除.
+并且返回SelectionKey代表了一个注册事件. 对于所有的已注册SelectionKey都保存在了Selector
+set key中,可以通过其Set<SelectionKey> keys()方法返回.
+对于已经被触发的注册感兴趣的事件 会返回selected-key set,通过其Set<SelectionKey> selectedKeys()
+方法返回.对于保存在Selector中的key set 是不能删除的,只有在selected-key set中可以通过其remove方法
+进行删除. 在Selector中还保存了一类SelectionKey 为 cancelled-key
+
+添加SelectionKey的方式就是Channel在调用register方法的时候,这个时候不仅仅就添加而且还会将其返回
+
+取消SelectionKey的方式就是SelectionKey#cancel方法进行取消或者关联的Channel被关闭了
+
+SelectionKey变为SelectedKey的时机就是当Channel注册的事件触发了
 
 2.方法定义
-TODO
+
+创建一个Selector 这个是默认的当时,底层是通过SPI的方式实现的
+public static Selector open() throws IOException {
+    return SelectorProvider.provider().openSelector();
+}
+
+判断当前的Selector是否打开的,被创建的时候就是打开的
+public abstract boolean isOpen()
+
+返回创建该Selector的SelectorProvider
+public abstract SelectorProvider provider()
+
+返回所有的注册的SelectionKey 不能被修改
+public abstract Set<SelectionKey> keys()
+
+返回被触发的SelectionKey集合,这个集合是可以被修改的 一般在处理完之后会被删除
+public abstract Set<SelectionKey> selectedKeys()
+
+返回的是感兴趣的事件被触发的数量 如果为0 那么说明没有事件被触发
+public abstract int selectNow() throws IOException
+
+这是一个堵塞一段时间的方法 超时如果还没有感兴趣的事件被触发 返回0
+public abstract int select(long timeout)
+
+一直堵塞直到有感兴趣的事件被触发
+public abstract int select() throws IOException
+
+如果Selector堵塞在select*上面,如果需要被唤醒的话 那么其他线程可以通过wakeup
+唤醒
+public abstract Selector wakeup()
+
+关闭该Selector,对于通过select堵塞的就像wakeup效果一样,对于其中
+的Channel会被取消的
+public abstract void close() throws IOException

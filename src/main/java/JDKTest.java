@@ -10,6 +10,7 @@ import java.lang.reflect.*;
 import java.net.InetSocketAddress;
 import java.net.URL;
 import java.nio.ByteBuffer;
+import java.nio.CharBuffer;
 import java.nio.channels.*;
 import java.security.AccessController;
 import java.security.ProtectionDomain;
@@ -256,7 +257,18 @@ public class JDKTest<K extends Object & Map, V> implements Serializable {
 
 //        testBufferMarkAndResetInWriteMode();
 
-        testServiceSocketChannel();
+//        testServiceSocketChannel();
+
+
+        new Thread(() -> {
+            try {
+                testServiceSocketChannel();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }).start();
+        TimeUnit.SECONDS.sleep(2);
+        testSocketServer();
     }
 
 
@@ -278,13 +290,84 @@ public class JDKTest<K extends Object & Map, V> implements Serializable {
                 Iterator<SelectionKey> selectionKeyIterator = selector.selectedKeys().iterator();
                 while (selectionKeyIterator.hasNext()) {
                     SelectionKey selectionKey = selectionKeyIterator.next();
-                    if (selectionKey.isAcceptable()){
-                        log("finished");
-                    }
                     selectionKeyIterator.remove();
+                    if (selectionKey.isAcceptable()) {
+                        log("finished");
+                        ServerSocketChannel serverSocketChannel = (ServerSocketChannel) selectionKey.channel();
+                        SocketChannel channel = serverSocketChannel.accept();
+                        channel.configureBlocking(false);
+                        channel.register(selector, SelectionKey.OP_READ);
+                    } else if (selectionKey.isReadable()) {
+//                        log("server");
+                        SocketChannel channel = (SocketChannel) selectionKey.channel();
+                        ByteBuffer byteBuffer = ByteBuffer.allocate(1024);
+                        int count = channel.read(byteBuffer);
+                        while (count > 0) {
+                            byteBuffer.flip();
+                            log(new String(byteBuffer.array(), 0, byteBuffer.remaining()));
+                            byteBuffer.clear();
+                            count = channel.read(byteBuffer);
+                        }
+                        channel.register(selector, SelectionKey.OP_WRITE);
+                    } else if (selectionKey.isWritable()) {
+                        ByteBuffer charBuffer = ByteBuffer.allocate(1024);
+                        charBuffer.put("from server\n".getBytes());
+                        SocketChannel channel = (SocketChannel) selectionKey.channel();
+                        charBuffer.flip();
+                        channel.write(charBuffer);
+                    }
                 }
             }
         }
+    }
+
+    public static void testSocketServer() throws Exception {
+
+        Selector selector = Selector.open();
+
+        SocketChannel socketChannel = SocketChannel.open();
+        socketChannel.configureBlocking(false);
+        socketChannel.register(selector, SelectionKey.OP_CONNECT);
+        socketChannel.connect(new InetSocketAddress("127.0.0.1",8082));
+
+
+        while (true) {
+            int i = selector.select();
+            if (i > 0) {
+                Set<SelectionKey> selectionKeySet = selector.selectedKeys();
+                Iterator<SelectionKey> iterator = selectionKeySet.iterator();
+                while (iterator.hasNext()) {
+
+                    SelectionKey sk = iterator.next();
+                    iterator.remove();
+                    if (sk.isConnectable()) {
+                        SocketChannel sc = (SocketChannel) sk.channel();
+                        ByteBuffer charBuffer = ByteBuffer.allocate(1024);
+                        charBuffer.put("from client".getBytes());
+                        SocketChannel channel = (SocketChannel) sk.channel();
+                        channel.finishConnect();
+                        charBuffer.flip();
+                        channel.write(charBuffer);
+                        sc.register(sk.selector(), SelectionKey.OP_READ);
+                    } else if (sk.isReadable()) {
+                        ByteBuffer byteBuffer = ByteBuffer.allocate(1024);
+                        SocketChannel sc = (SocketChannel) sk.channel();
+                        int j = sc.read(byteBuffer);
+                        if (j > 0) {
+                            byteBuffer.flip();
+                            log(new String(byteBuffer.array(), 0, byteBuffer.remaining()));
+                            j = sc.read(byteBuffer);
+                        }
+                        ByteBuffer charBuffer = ByteBuffer.allocate(1024);
+                        charBuffer.put("from client".getBytes());
+                        charBuffer.flip();
+                        sc.write(charBuffer);
+                    } else if (sk.isWritable()) {
+                    }
+                }
+            }
+        }
+
     }
 
     public static void testInputStreamMarkAndReset() {

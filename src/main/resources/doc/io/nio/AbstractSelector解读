@@ -1,0 +1,68 @@
+AbstractSelector解读
+
+1.Selector的基础实现,保存了取消的selectionKey,定义了注册SelectableChannel的抽象方法
+
+该类中实现了对于Selector的堵塞中断逻辑处理机制,在处理堵塞操作的时候需要调用类中的成对方法
+try {
+  begin();
+  // Perform blocking I/O operation here
+  ...
+} finally {
+  end();
+}
+用来处理堵塞的中断
+
+2.方法分析
+取消SelectionKey 移除的具体的逻辑在每次select的时候
+void cancel(SelectionKey k) {
+    synchronized (cancelledKeys) {
+        cancelledKeys.add(k);
+    }
+}
+
+关闭Selector
+public final void close() throws IOException {
+    boolean open = selectorOpen.getAndSet(false);
+    if (!open)
+        return;
+        //子类实现的方法 子类中就将Channel和SelectionKey进行关闭和取消
+    implCloseSelector();
+}
+
+抽象方法 注册AbstractSelectableChannel
+protected abstract SelectionKey register(AbstractSelectableChannel ch,
+                                             int ops, Object att);
+
+
+解除SelectionKey的注册 可见内部的逻辑 是将SelectionKey从Channel移除
+protected final void deregister(AbstractSelectionKey key) {
+    ((AbstractSelectableChannel)key.channel()).removeKey(key);
+}
+
+
+3.中断机制
+protected final void begin() {
+    //这里设置interruptor 是为了保存中断的中断器
+    if (interruptor == null) {
+        interruptor = new Interruptible() {
+                public void interrupt(Thread ignore) {
+                    //如果被中断 对当前的Selector进行唤醒
+                    AbstractSelector.this.wakeup();
+                }};
+    }
+
+    //这里的设置 最后提现在java.lang.Thread.blocker
+    AbstractInterruptibleChannel.blockedOn(interruptor);
+    Thread me = Thread.currentThread();
+    if (me.isInterrupted())
+        //先尝试将当前的堵塞的状态给唤醒
+        interruptor.interrupt(me);
+}
+
+protected final void end() {
+    //将当前线程的java.lang.Thread.blocker设置为null
+    AbstractInterruptibleChannel.blockedOn(null);
+}
+
+
+

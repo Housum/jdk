@@ -3,5 +3,28 @@ FileDescriptor 解读
 1. 文件描述符,可以和Linux中描述符看成是一个东西,是隐藏在底层与机器相关的
 处理结构数据比如文件；Socket或者其他的一系列流
 
-2.TODO 待后续添加理解的更深的内容
+Wiki中:
+在wiki中的描述
+是一个用于表述指向文件的引用的抽象化概念。在形式上是一个非负整数。实际上，它是一个索引值，
+指向内核为每一个进程所维护的该进程打开文件的记录表。当程序打开一个现有文件或者创建一个新文件时，
+内核向进程返回一个文件描述符。在程序设计中，一些涉及底层的程序编写往往会围绕着文件描述符展开。
+但是文件描述符这一概念往往只适用于UNIX、Linux这样的操作系统
 
+下面是网上的解答:
+打开文件或者socket之后给你一个fd，然后你可以拿着fd去操作文件或者socket，也可以把这个fd做为参数传来传去。
+你不能把文件或者socket“本身”作为一个参数传给一个函数吧，传fd就可以，因为它就是一个类似指针的东西。
+函数里面就根据这个fd对这同一个文件或者已经建立的socket连接进行操作。
+之所以socket和文件都有fd的原因是都可以在上面做打开，关闭，读，写等等操作。
+
+2.在FileDescriptor中 有三个预定义的三个类 指定了三个文件描述符 分别表示了
+标准输出 标准输入 标准错误输出 具体详情见《System 解读》System.out System.in System.err
+public static final FileDescriptor in = new FileDescriptor(0);
+public static final FileDescriptor out = new FileDescriptor(1);
+public static final FileDescriptor err = new FileDescriptor(2);
+
+
+3.文件描述符:
+https://www.cnblogs.com/alan666/p/8311890.html
+
+
+4.文件描述符非常的重要,所以对于IO操作底层都是对于它的操作

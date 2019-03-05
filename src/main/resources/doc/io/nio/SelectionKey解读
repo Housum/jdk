@@ -1,0 +1,89 @@
+SelectionKey解读
+
+1.SelectableChannel在Selector注册时候生成的token,被创建的时候是合法的,直到
+被取消的,或者关闭Channel,或者关闭Selector的时候.
+
+包含了两个重要的东西,第一个是interest set 表示的是底层每次都会测试是否已经有满足的
+事件被触发.第二个就是ready set,表示的是已经被触发了.
+
+通过attach方法关联对象
+
+
+2.感兴趣的事件
+事件主要分为4个
+
+注册的channel能够读取数据了
+如果channel注册了该事件 那么当channel能够读取数据的时候
+该事件会变为ready 状态=> 就是被触发了该事件了.将会被加入到
+Selector的selected-key中
+public static final int OP_READ = 1 << 0;
+
+注册的channel能够写入数据了
+如果channel注册了该事件 那么当channel能够读取数据的时候
+该事件会变为ready 状态=> 就是被触发了该事件了.将会被加入到
+Selector的selected-key中
+public static final int OP_WRITE = 1 << 2;
+
+如果该channel注册了该事件 那么当channel已经完成了连接
+该事件会变为ready 状态=> 就是被触发了该事件了.将会被加入到
+Selector的selected-key中
+public static final int OP_CONNECT = 1 << 3;
+
+server-socket channel is ready to accept another connection
+public static final int OP_ACCEPT = 1 << 4;
+
+其中OP_CONNECT只能在客户端注册,在客户端进行连接之前需要注册该事件
+这样在之后连接上之后interestOps就包含OP_CONNECT,在客户端连接上之后
+需要调用channel.finishConnect()完成连接 才能进行下一步操作
+
+其中OP_ACCEPT只能在服务端注册,在服务端启动的时候之前需要注册事件
+这样之后有客户端连接就会被触发interestOps就包含OP_ACCEPT
+
+具体的Channel支持的事件见：java.nio.channels.SelectableChannel.validOps
+
+对应的方法:
+判断该channel是否能够读数据了
+public final boolean isReadable() {
+    return (readyOps() & OP_READ) != 0;
+}
+判断该channel是否能够写数据了
+public final boolean isWritable() {
+    return (readyOps() & OP_WRITE) != 0;
+}
+判断是否已经连接已经完成了
+public final boolean isConnectable() {
+    return (readyOps() & OP_CONNECT) != 0;
+}
+该channel是否已经可以接受一个新的socket连接了
+public final boolean isAcceptable() {
+    return (readyOps() & OP_ACCEPT) != 0;
+}
+
+2.其他方法分析
+
+注册的那个SelectableChannel,在被触发之后可以重新拿到
+进行处理
+public abstract SelectableChannel channel()
+
+进行注册的Selector
+public abstract Selector selector()
+
+在SelectionKey被取消之前都是合法的
+取消: 调用cancel,关闭Channel,关闭Selector
+public abstract boolean isValid()
+
+取消该SelectionKey
+public abstract void cancel()
+
+返回SelectableChannel所注册的感兴趣的事件
+public abstract int interestOps()
+
+除了在创建的时候注册感兴趣的事件,还可以通过方法进行设置
+public abstract SelectionKey interestOps(int ops)
+
+已经被触发的事件
+public abstract int readyOps()
+
+具体的:
+JDKTest.testServiceSocketChannel
+JDKTest.testSocketServer
