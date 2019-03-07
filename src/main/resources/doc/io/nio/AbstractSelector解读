@@ -1,6 +1,6 @@
 AbstractSelector解读
 
-1.Selector的基础实现,保存了取消的selectionKey,定义了注册SelectableChannel的抽象方法
+1.Selector的抽象方法,保存了取消的selectionKey,定义了注册SelectableChannel的抽象方法
 
 该类中实现了对于Selector的堵塞中断逻辑处理机制,在处理堵塞操作的时候需要调用类中的成对方法
 try {
@@ -13,7 +13,8 @@ try {
 用来处理堵塞的中断
 
 2.方法分析
-取消SelectionKey 移除的具体的逻辑在每次select的时候
+取消SelectionKey 这里只是取消了SelectionKey但是将其移除是在
+后面的select的时候进行移除的. 具体见sun.nio.ch.SelectorImpl.processDeregisterQueue
 void cancel(SelectionKey k) {
     synchronized (cancelledKeys) {
         cancelledKeys.add(k);

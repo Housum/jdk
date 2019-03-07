@@ -41,7 +41,10 @@ public abstract int selectNow() throws IOException
 这是一个堵塞一段时间的方法 超时如果还没有感兴趣的事件被触发 返回0
 public abstract int select(long timeout)
 
-一直堵塞直到有感兴趣的事件被触发
+一直堵塞直到有感兴趣的事件被触发或者被中断或者wakeup方法被唤醒
+那么就会返回0,注意当任务被触发之后但是没有新事件被注册 那么调用select的时候
+不会堵塞只会返回0(所以在Netty在这块有专门的处理 io.netty.channel.nio.NioEventLoop#rebuildSelector
+Netty 4.1.13 Final 当这种情况持续一段时间的话 那么重新构建Selector)
 public abstract int select() throws IOException
 
 如果Selector堵塞在select*上面,如果需要被唤醒的话 那么其他线程可以通过wakeup

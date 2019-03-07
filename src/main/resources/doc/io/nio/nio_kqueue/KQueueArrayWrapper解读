@@ -1,0 +1,42 @@
+KQueueArrayWrapper 解读
+
+1.包装KQueue的实现,实现了事件的注册,事件的检测等等,存放已经被触发事件的
+数组
+
+2.流程实现分析
+内部所做的事情: 创建存放事件的数组(采用直接内存的方式)->通过kqueue内核函数生成一个内核事件队列并且返回
+文件描述符->当调用doSelect的时候 当channel的文件描述符注册到内核事件队列中,通过kevent内核函数
+将已经触发的事件都存放到keventArray中
+
+
+3.方法分析
+
+
+
+
+
+
+
+4.属性分析
+以下属性都是在native中进行赋值的
+
+static short EVFILT_READ;
+static short EVFILT_WRITE;
+这两个属性见:https://blog.csdn.net/Timeinsist/article/details/80978713
+
+static short SIZEOF_KEVENT;
+每个事件的数据结果存放的大小 因为是底层是通过直接内存保存的 所以在创建的时候
+之后返回一个起始指针 通过这个指针向后寻址
+
+static short FD_OFFSET;
+事件的起始位置
+
+static short FILTER_OFFSET;
+EVFILT_READ EVFILT_WRITE的起始位置
+
+
+
+
+
+
+

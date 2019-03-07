@@ -27,4 +27,4 @@ public static final FileDescriptor err = new FileDescriptor(2);
 https://www.cnblogs.com/alan666/p/8311890.html
 
 
-4.文件描述符非常的重要,所以对于IO操作底层都是对于它的操作
+4.文件描述符非常的重要,所以对于IO操作底层都是对于它的操作,

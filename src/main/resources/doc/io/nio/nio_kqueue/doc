@@ -1,0 +1,21 @@
+KQueue IO模型
+该IO为NIO模型,在FreeBSD 和 MacOS中使用
+
+1.简介
+https://www.cnblogs.com/FG123/p/5256553.html
+和epoll很类似,epoll可以看:https://www.zhihu.com/question/20122137
+
+2.API:
+https://blog.csdn.net/Timeinsist/article/details/80978713
+https://www.cnblogs.com/FG123/p/5256553.html 两个结合起来
+
+3.JAVA中实现,主要的逻辑都在KQueueArrayWrapper中 其中封装了关于KQueue的逻辑
+
+KQueueArrayWrapper native代码:
+https://github.com/frohoff/jdk8u-dev-jdk/blob/da0da73ab82ed714dc5be94acd2f0d00fbdfe2e9/src/macosx/native/sun/nio/ch/KQueueArrayWrapper.c
+
+4.KQueue 的Selector:
+
+主要关注的类
+sun.nio.ch.KQueueSelectorImpl
+sun.nio.ch.KQueueArrayWrapper

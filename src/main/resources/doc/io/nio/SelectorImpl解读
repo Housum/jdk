@@ -1,0 +1,162 @@
+SelectorImpl 解读
+
+源码位置
+https://github.com/frohoff/jdk8u-dev-jdk/blob/da0da73ab82ed714dc5be94acd2f0d00fbdfe2e9/src/share/classes/sun/nio/ch/SelectorImpl.java
+
+1.Selector的基本的实现,实现了很多的通用的方法,只提供了底层select的具体实现(底层实现了不同的模型实现不同的方式,kqueue,epoll,poll等)
+实现的方法有:SelectableChannel的注册,将取消的SelectionKey移除
+
+2.方法
+构造函数:
+protected SelectorImpl(SelectorProvider sp) {
+    super(sp);
+    keys = new HashSet<SelectionKey>();
+    selectedKeys = new HashSet<SelectionKey>();
+    if (Util.atBugLevel("1.4")) {
+        publicKeys = keys;
+        publicSelectedKeys = selectedKeys;
+    } else {
+        //设置为不可变的
+        publicKeys = Collections.unmodifiableSet(keys);
+        publicSelectedKeys = Util.ungrowableSet(selectedKeys);
+    }
+}
+
+返回所需的SelectionKey
+public Set<SelectionKey> keys() {
+    if (!isOpen() && !Util.atBugLevel("1.4"))
+        throw new ClosedSelectorException();
+    return publicKeys;
+}
+public Set<SelectionKey> selectedKeys() {
+    if (!isOpen() && !Util.atBugLevel("1.4"))
+        throw new ClosedSelectorException();
+    return publicSelectedKeys;
+}
+
+进行是否有事件有触发 这三个方法最后都是使用的lockAndDoSelect
+public int select(long var1) throws IOException {
+    if (var1 < 0L) {
+        throw new IllegalArgumentException("Negative timeout");
+    } else {
+        return this.lockAndDoSelect(var1 == 0L ? -1L : var1);
+    }
+}
+public int select() throws IOException {
+    return this.select(0L);
+}
+public int selectNow() throws IOException {
+    return this.lockAndDoSelect(0L);
+}
+
+lockAndDoSelect方法 当var1为0的时候 表示的是马上返回 -1表示一直堵塞 大于0表示等待的事件
+单位为纳秒
+private int lockAndDoSelect(long var1) throws IOException {
+        //这里加了一个锁
+        synchronized(this) {
+            if (!this.isOpen()) {
+                throw new ClosedSelectorException();
+            } else {
+                int var10000;
+                synchronized(this.publicKeys) {
+                    synchronized(this.publicSelectedKeys) {
+                        //获取触发的事件
+                        var10000 = this.doSelect(var1);
+                    }
+                }
+
+                return var10000;
+            }
+        }
+    }
+
+关闭selector
+public void implCloseSelector() throws IOException {
+     //这里将所有堵塞的线程都进行唤醒
+     this.wakeup();
+     //这段和lockAndDoSelect中锁加锁的资源是一样的 这部分竞态条件
+     //是为了防止停止的时候还在select
+     synchronized(this) {
+         synchronized(this.publicKeys) {
+             synchronized(this.publicSelectedKeys) {
+                 //具体子类实现的逻辑
+                 this.implClose();
+             }
+         }
+
+     }
+}
+
+SelectableChannel注册
+protected final SelectionKey register(AbstractSelectableChannel var1, int var2, Object var3) {
+    if (!(var1 instanceof SelChImpl)) {
+        throw new IllegalSelectorException();
+    } else {
+        SelectionKeyImpl var4 = new SelectionKeyImpl((SelChImpl)var1, this);
+        var4.attach(var3);
+        synchronized(this.publicKeys) {
+            //注册 子类实现 一般都是将其加入到keys,并且做其他的一些事情
+            this.implRegister(var4);
+        }
+
+        //这个方法很关键 这一步将会调用putEventOps 方法 真正意义上的将事件给注册到了物理层
+        var4.interestOps(var2);
+        return var4;
+    }
+}
+
+移除取消的SelectionKey
+void processDeregisterQueue() throws IOException {
+    Set var1 = this.cancelledKeys();
+    synchronized(var1) {
+        if (!var1.isEmpty()) {
+            Iterator var3 = var1.iterator();
+            //遍历取消key的列表  从集合中移除
+            while(var3.hasNext()) {
+                SelectionKeyImpl var4 = (SelectionKeyImpl)var3.next();
+                try {
+                    //子类具体实现 一般都是从keys中进行移除 取消在具体的文件描述符上面注册的事件
+                    this.implDereg(var4);
+                } catch (SocketException var11) {
+                    throw new IOException("Error deregistering key", var11);
+                } finally {
+                    var3.remove();
+                }
+            }
+        }
+    }
+}
+
+子类需要实现的方法:
+protected abstract int doSelect(long var1) throws IOException
+具体子类实现不同的IO模型进行事件的获取 子类实现主要有(MacOS,FreeBSD 使用的是Kqueue模型,Linux使用的是epoll模型)
+
+protected abstract void implClose() throws IOException
+子类实现在关闭Selector的操作
+
+public void putEventOps(SelectionKeyImpl sk, int interestOps) {
+}
+设置SelectionKey注册的事件 这个方法非常的关键 这个方法才是真正的将事件注册到到物理层 见register方法
+在 sun.nio.ch.SelectionKeyImpl.nioInterestOps(int)
+
+protected abstract void implRegister(SelectionKeyImpl var1)
+注册之后子类实现的逻辑 主要就是将其加入到keys，以及将channel对应的文件描述符给保存以来这样在之后触发
+事件以后才能找到对应的注册事件
+
+protected abstract void implDereg(SelectionKeyImpl var1) throws IOException;
+解除注册 见processDeregisterQueue,在移除取消的SelectionKey的时候也需要将其移除注册
+
+public abstract Selector wakeup();
+唤醒Selector因select*而堵塞的线程
+
+3.属性
+被触发的事件的SelectionKey
+protected Set<SelectionKey> selectedKeys
+所有注册的SelectionKey
+protected HashSet<SelectionKey> keys;
+
+注意上面属性是protected 因为在不同的实现中都会针对这两个属性进行操作
+
+这两个属性只是作为视图使用 引用是不可变的
+private Set<SelectionKey> publicKeys;             // Immutable
+private Set<SelectionKey> publicSelectedKeys
