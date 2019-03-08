@@ -344,7 +344,7 @@ public class JDKTest<K extends Object & Map, V> implements Serializable {
         if (selectionKey.isConnectable()) {
             SocketChannel socketChannel1 = (SocketChannel) selectionKey.channel();
             socketChannel1.finishConnect();
-            socketChannel1.register(selector, SelectionKey.OP_READ);
+//            socketChannel1.register(selector, SelectionKey.OP_READ);
         }
 
 

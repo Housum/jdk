@@ -10,12 +10,124 @@ KQueueArrayWrapper 解读
 
 
 3.方法分析
+构造函数
+KQueueArrayWrapper() {
+    //var1 表示的是总的内存空间 每次128个
+    int var1 = SIZEOF_KEVENT * 128;
+    this.keventArray = new AllocatedNativeObject(var1, true);
+    this.keventArrayAddress = this.keventArray.address();
+    //生成一个内核事件队列 并且返回文件描述符
+    this.kq = this.init();
+}
 
+初始化中断文件描述符
+void initInterrupt(int var1, int var2) {
+    //输出
+    this.outgoingInterruptFD = var2;
+    //输入
+    this.incomingInterruptFD = var1;
+    //将incomingInterruptFD注册为读事件 并且将写事件给反注册
+    this.register0(this.kq, var1, 1, 0);
+}
 
+获取事件注册标示值
+int getReventOps(int var1) {
+    int var2 = 0;
+    //因为我们已经有FILTER_OFFSET 是kqueue数据结构中filter属性的偏移量 然后我们可以通过
+    //内存地址、以及偏移量、每单元存放的大小空间就能够找到filter
+    int var3 = SIZEOF_KEVENT * var1 + FILTER_OFFSET;
+    short var4 = this.keventArray.getShort(var3);
+    //以下是将事件进行映射
+    //如果是读事件
+    if (var4 == EVFILT_READ) {
+        var2 |= Net.POLLIN;
+    } else if (var4 == EVFILT_WRITE) {
+    //如果是写事件
+        var2 |= Net.POLLOUT;
+    }
+    return var2;
+}
 
+获取事件的文件描述符
+int getDescriptor(int var1) {
+    //参考 'getReventOps' 的分析
+    int var2 = SIZEOF_KEVENT * var1 + FD_OFFSET;
+    if (is64bit) {
+        long var3 = this.keventArray.getLong(var2);
 
+        assert var3 <= 2147483647L;
 
+        return (int)var3;
+    } else {
+        return this.keventArray.getInt(var2);
+    }
+}
 
+将事件以及事件源保存起来了 在后面的poll方法中进行真正的注册(也就是doSelect)
+void setInterest(SelChImpl var1, int var2) {
+    synchronized(this.updateList) {
+        this.updateList.add(new KQueueArrayWrapper.Update(var1, var2));
+    }
+}
+
+将事件进行反注册(取消注册),在dregister时候调用
+void release(SelChImpl var1) {
+    synchronized(this.updateList) {
+        Iterator var3 = this.updateList.iterator();
+
+        while(var3.hasNext()) {
+            if (((KQueueArrayWrapper.Update)var3.next()).channel == var1) {
+                var3.remove();
+            }
+        }
+        //将读写事件都取消
+        this.register0(this.kq, var1.getFDVal(), 0, 0);
+    }
+}
+
+该方法才是真正的将注册是SelectableChannel进行注册
+void updateRegistrations() {
+    synchronized(this.updateList) {
+        KQueueArrayWrapper.Update var2 = null;
+
+        while((var2 = (KQueueArrayWrapper.Update)this.updateList.poll()) != null) {
+            SelChImpl var3 = var2.channel;
+            if (var3.isOpen()) {
+                //如果channel是打开的话 那么将文件描述符该channel文件描述符注册到该kqueue内核队列中
+                //注册的事件是读写(& 表示的是有的话只注册该事件 否则不注册)
+                this.register0(this.kq, var3.getFDVal(), var2.events & Net.POLLIN, var2.events & Net.POLLOUT);
+            }
+        }
+
+    }
+}
+
+关闭该kqueue内核队列
+void close() throws IOException {
+    if (this.keventArray != null) {
+        this.keventArray.free();
+        this.keventArray = null;
+    }
+
+    if (this.kq >= 0) {
+        FileDispatcherImpl.closeIntFD(this.kq);
+        this.kq = -1;
+    }
+}
+
+查看是否有事件被触发 返回的是被触发事件的总数
+int poll(long var1) {
+    //第一步是将注册事件注册
+    this.updateRegistrations();
+    //第二步就是检查是否有事件已经被触发
+    int var3 = this.kevent0(this.kq, this.keventArrayAddress, 128, var1);
+    return var3;
+}
+
+//中断
+void interrupt() {
+    interrupt(this.outgoingInterruptFD);
+}
 
 4.属性分析
 以下属性都是在native中进行赋值的
@@ -27,15 +139,40 @@ static short EVFILT_WRITE;
 static short SIZEOF_KEVENT;
 每个事件的数据结果存放的大小 因为是底层是通过直接内存保存的 所以在创建的时候
 之后返回一个起始指针 通过这个指针向后寻址
+一个SIZEOF_KEVENT单位内存放了一个kevent事件
+kevent事件的数据结构见 '5.kqueue数据结构'
+
 
 static short FD_OFFSET;
-事件的起始位置
-
+单个kevent数据结构ident的偏移位置 根据这个位置能够定位到
+文件描述符
 static short FILTER_OFFSET;
-EVFILT_READ EVFILT_WRITE的起始位置
+单个kevent数据结构filter的偏移位置 根据这个位置能够定位到
+事件标示值
+*_OFFSET 是通过offsetof方法计算出
 
 
+5.kqueue数据结构
+struct kevent{
+    uintptr_t   ident;      /*事件描述符，一般为设备文件描述符*/
+    short       filter;     /*事件过滤器*/
+    u_short     flags;      /*行为标示*/
+    u_int       fflages;    /*过滤标示值*/
+    intptr_t    data;       /*过滤器数据*/
+    void*       udata;      /*应用透传数据*/
+};
 
+6.kqueue方法
+
+int kqueue(void); 生成内核事件
+
+int kevent(int kq,                  /*输入参数：kqueue 队列描述符*/
+const struct kevent* changelist,    /*输入参数： 注册或者反注册的事件数组*/
+int nchanges,                       /*输入参数： 注册或者反注册事件数目*/
+struct kevent* eventlist,           /*输出参数： 已触发事件数组*/
+int neventlist,                        /*输出参数： 已触发事件个数*/
+const struct timespec* timeout);    /*等待时间： 0立即返回，NULL 一直等待，知道通知事件发生，否者：指定等待时间*/
+/*返回值： 触发事件数目*/
 
 
 

@@ -1,0 +1,214 @@
+KQueueSelectorImpl 解读
+
+1.Selector的KQueue实现,封装了注册事件,取消事件,反注册时间,唤醒,关闭等方法 真正的底层内核方法实现都在
+KQueueArrayWrapper的native方法
+
+
+2.方法分析
+构造函数
+KQueueSelectorImpl(SelectorProvider var1) {
+        super(var1);
+        //构建一个管道流 前32位是读的文件描述符
+        //后32位是写的文件描述符
+        long var2 = IOUtil.makePipe(false);
+        this.fd0 = (int)(var2 >>> 32);
+        this.fd1 = (int)var2;
+
+        try {
+            //初始化KQueueArrayWrapper  详情见《KQueueArrayWrapper解读》
+            this.kqueueWrapper = new KQueueArrayWrapper();
+            //初始化中断文件描述符
+            this.kqueueWrapper.initInterrupt(this.fd0, this.fd1);
+            this.fdMap = new HashMap();
+            this.totalChannels = 1;
+        } catch (Throwable var8) {
+            try {
+                FileDispatcherImpl.closeIntFD(this.fd0);
+            } catch (IOException var7) {
+                var8.addSuppressed(var7);
+            }
+
+            try {
+                FileDispatcherImpl.closeIntFD(this.fd1);
+            } catch (IOException var6) {
+                var8.addSuppressed(var6);
+            }
+
+            throw var8;
+        }
+}
+
+实现了select*方法
+protected int doSelect(long var1) throws IOException {
+        boolean var3 = false;
+        //判断是否关闭
+        if (this.closed) {
+            throw new ClosedSelectorException();
+        } else {
+            //见 《SelectorImpl 解读》 移除取消的SelectionKey 并且反注册
+            //关联的channel的事件
+            this.processDeregisterQueue();
+
+            int var7;
+            try {
+                this.begin();
+                //见 《KQueueArrayWrapper 解读》 这部分只是将事件给注册到内核中
+                //并且查看内核队列是否有事件被触发
+                var7 = this.kqueueWrapper.poll(var1);
+            } finally {
+                this.end();
+            }
+            this.processDeregisterQueue();
+            //这部分才是真正的查询触发的内核事件和注册的事件是否有对于关闭
+            //返回的就是锁触发的事件个数
+            return this.updateSelectedKeys(var7);
+        }
+}
+
+//该方法很重要 这部分就是将被触发事件给放入到了selectedKey中
+//如果发现中断文件描述符被触发的话 那么将缓存区给清理掉 并且设置
+//中断状态为false
+private int updateSelectedKeys(int entries) throws IOException {
+        //记录有多少个事件修改了
+        int numKeysUpdated = 0;
+        boolean interrupted = false;
+        ++this.updateCount;
+
+        for(int i = 0; i < entries; ++i) {
+            //这里是从0开始去kqueueWrpaper中获取kevent事件中的文件描述符(就是channel对于的文件描述符)
+            //在kqueueWrapper中的格式是: arr[kevent,...,kevent]   arr.length = entries
+            //具体的kevent分析参考《KQueueArrayWrapper 解读》
+            int nextFD = this.kqueueWrapper.getDescriptor(i);
+            if (nextFD == this.fd0) {
+                interrupted = true;
+            } else {
+                //在注册的时候放入到了map中
+                KQueueSelectorImpl.MapEntry me = (KQueueSelectorImpl.MapEntry)this.fdMap.get(nextFD);
+                if (me != null) {
+                    //和this.kqueueWrapper.getDescriptor(i) 一样 只是获得的是kevent事件中注册事件
+                    int ops = this.kqueueWrapper.getReventOps(i);
+                    SelectionKeyImpl ski = me.ski;
+                    //有可能存在一个channel定义了多个事件所以一个channel的fd对于了
+                    //多个的kevent 所以通过updateCount来记录最后一次更新的状态
+                    //这样做的话 就可以做到更新readyOps 而不是成了设置readyOps
+                    if (this.selectedKeys.contains(ski)) {
+                        if (me.updateCount != this.updateCount) {
+                            //设置SelectionKey的readyOps 其中设置的时候还与Channel的状态有关
+                            if (ski.channel.translateAndSetReadyOps(ops, ski)) {
+                                ++numKeysUpdated;
+                                me.updateCount = this.updateCount;
+                            }
+                        } else {
+                            //如果是更新的话 那么不进行设置 而不是进行更新
+                            ski.channel.translateAndUpdateReadyOps(ops, ski);
+                        }
+                    } else {
+                        //第一次
+                        ski.channel.translateAndSetReadyOps(ops, ski);
+                        if ((ski.nioReadyOps() & ski.nioInterestOps()) != 0) {
+                            this.selectedKeys.add(var8);
+                            ++numKeysUpdated;
+                            //前面提到的 记录最后一次更新次数 为了识别SelectionKey是否是有注册了多个事件
+                            me.updateCount = this.updateCount;
+                        }
+                    }
+                }
+            }
+        }
+
+        //是否中断
+        if (interrupted) {
+            synchronized(this.interruptLock) {
+                IOUtil.drain(this.fd0);
+                this.interruptTriggered = false;
+            }
+        }
+        return numKeysUpdated;
+}
+
+关闭Selector
+protected void implClose() throws IOException {
+        if (!this.closed) {
+            this.closed = true;
+            synchronized(this.interruptLock) {
+                this.interruptTriggered = true;
+            }
+            //关闭文件描述符
+            FileDispatcherImpl.closeIntFD(this.fd0);
+            FileDispatcherImpl.closeIntFD(this.fd1);
+            if (this.kqueueWrapper != null) {
+                //关闭kqueueWrapper
+                this.kqueueWrapper.close();
+                this.kqueueWrapper = null;
+                this.selectedKeys = null;
+
+                for(Iterator var1 = this.keys.iterator(); var1.hasNext(); var1.remove()) {
+                    SelectionKeyImpl var2 = (SelectionKeyImpl)var1.next();
+                    //反注册SelectionKey 这里就是从channel中移除了SelectionKey
+                    this.deregister(var2);
+
+                    //判断channel是否能够关闭
+                    SelectableChannel var3 = var2.channel();
+                    if (!var3.isOpen() && !var3.isRegistered()) {
+                        ((SelChImpl)var3).kill();
+                    }
+                }
+                this.totalChannels = 0;
+            }
+            this.fd0 = -1;
+            this.fd1 = -1;
+        }
+}
+
+注册SelectionKey
+protected void implRegister(SelectionKeyImpl var1) {
+    if (this.closed) {
+        throw new ClosedSelectorException();
+    } else {
+        //获取文件channel的文件描述符
+        int var2 = IOUtil.fdVal(var1.channel.getFD());
+        //放入到map中  updateSelectedKeys 的时候需要使用
+        this.fdMap.put(var2, new KQueueSelectorImpl.MapEntry(var1));
+        ++this.totalChannels;
+        //加入注册的keys集合中
+        this.keys.add(var1);
+    }
+}
+
+反注册key
+protected void implDereg(SelectionKeyImpl var1) throws IOException {
+    int var2 = var1.channel.getFDVal();
+    this.fdMap.remove(var2);
+    //参考《KQueueArrayWrapper解读》
+    this.kqueueWrapper.release(var1.channel);
+    --this.totalChannels;
+    //移除
+    this.keys.remove(var1);
+    this.selectedKeys.remove(var1);
+    this.deregister(var1);
+    SelectableChannel var3 = var1.channel();
+    //如果channel关闭了的话 那么进行关闭
+    if (!var3.isOpen() && !var3.isRegistered()) {
+        ((SelChImpl)var3).kill();
+    }
+}
+注册事件 key和注册事件是分开的
+public void putEventOps(SelectionKeyImpl var1, int var2) {
+        if (this.closed) {
+            throw new ClosedSelectorException();
+        } else {
+            //也是通过KQueueArrayWrapper实现
+            this.kqueueWrapper.setInterest(var1.channel, var2);
+        }
+}
+唤醒
+public Selector wakeup() {
+    synchronized(this.interruptLock) {
+        if (!this.interruptTriggered) {
+            //将当前的堵塞进行进行中断
+            this.kqueueWrapper.interrupt();
+            this.interruptTriggered = true;
+        }
+        return this;
+    }
+}
