@@ -164,8 +164,9 @@ struct kevent{
 
 6.kqueue方法
 
-int kqueue(void); 生成内核事件
+int kqueue(void); 生成内核队列
 
+操作kqueue内核队列 
 int kevent(int kq,                  /*输入参数：kqueue 队列描述符*/
 const struct kevent* changelist,    /*输入参数： 注册或者反注册的事件数组*/
 int nchanges,                       /*输入参数： 注册或者反注册事件数目*/

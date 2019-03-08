@@ -1,0 +1,120 @@
+EPollArrayWrapper解读
+
+1.包装了EPoll的实现,其中完成了epoll内核函数的调用(当然这些都是native方法),其中包含的内核函数
+为创建内核队列,加入或者取消事件,等待事件 . 除了这之外 内部还创建了一个保存被触发事件的数组(通过直接内存
+分配了一块地址 和KQueueArrayWrapper 一样)
+
+2.native在:
+https://lobin.iteye.com/blog/2324629
+
+3.调用流程
+EPollSelectorImpl注册 调用add方法,将关联的channel的文件描述符保存在数据中->将文件描述符的事件通过setInterest
+进行设置,将文件描述符和事件关联上-> selector调用doSelect,然后调用poll,这个时候才真正的将文件描述符的事件注册到
+epoll内核队列中, 并且查看内核队列中是否有事件发生
+
+
+4.方法分析
+大致和KQueue类型,将按照注册,触发,反注册,和关系分析
+注册:
+在调用register的时候调用 将关联的channel的文件描述符传入
+void add(int fd) {
+    // force the initial update events to 0 as it may be KILLED by a
+    // previous registration.
+    synchronized (updateLock) {
+        assert !registered.get(fd);
+        //先将其设置为0 因为可能已经存在了 并且被remove掉了
+        setUpdateEvents(fd, (byte)0, true);
+    }
+}
+将文件描述符关联事件保存起来
+private void setUpdateEvents(int fd, byte events, boolean force) {
+    //不同的范围保存在不同的地方 这样设计在于 如果很少的部分的时候 不需要创建Map
+    //使用数组有更高的性能
+    if (fd < MAX_UPDATE_ARRAY_SIZE) {
+        if ((eventsLow[fd] != KILLED) || force) {
+            eventsLow[fd] = events;
+        }
+    } else {
+        Integer key = Integer.valueOf(fd);
+        if (!isEventsHighKilled(key) || force) {
+            eventsHigh.put(key, Byte.valueOf(events));
+        }
+    }
+}
+将事件注册到文件描述符上面
+void setInterest(int fd, int mask) {
+    synchronized (updateLock) {
+        // record the file descriptor and events
+        int oldCapacity = updateDescriptors.length;
+        //如果放不下的话 扩容updateDescriptors 保存的是注册了事件的文件描述符
+        if (updateCount == oldCapacity) {
+            int newCapacity = oldCapacity + INITIAL_PENDING_UPDATE_SIZE;
+            int[] newDescriptors = new int[newCapacity];
+            System.arraycopy(updateDescriptors, 0, newDescriptors, 0, oldCapacity);
+            updateDescriptors = newDescriptors;
+        }
+        updateDescriptors[updateCount++] = fd;
+
+        // events are stored as bytes for efficiency reasons
+        byte b = (byte)mask;
+        assert (b == mask) && (b != KILLED);
+        //将事件关联到fd
+        setUpdateEvents(fd, b, false);
+    }
+}
+触发:
+
+
+
+
+
+
+
+5.关键属性
+private final byte[] eventsLow = new byte[MAX_UPDATE_ARRAY_SIZE];
+private Map<Integer,Byte> eventsHigh;
+这两个都是为了保存文件描述符的 当文件描述符小于MAX_UPDATE_ARRAY_SIZE 放在eventsLow中
+当大于的时候放在eventsHigh中,eventsLow 索引放的是文件描述符 值放的是事件. eventsHigh key
+保存的是文件描述符 值放的是事件
+
+
+
+
+6.epoll数据结构
+保存触发事件的某个文件描述符相关的数据（
+typedef union epoll_data {
+  void ptr;
+  int fd;
+  __uint32_t u32;
+  __uint64_t u64;
+} epoll_data_t;
+感兴趣的事件和被触发的事件
+struct epoll_event {
+  __uint32_t events;
+  epoll_data_t data;
+};
+events可以是以下几个宏的集合：
+EPOLLIN ：表示对应的文件描述符可以读（包括对端SOCKET正常关闭）；
+EPOLLOUT：表示对应的文件描述符可以写；
+EPOLLPRI：表示对应的文件描述符有紧急的数据可读（这里应该表示有带外数据到来）；
+EPOLLERR：表示对应的文件描述符发生错误；
+EPOLLHUP：表示对应的文件描述符被挂断；
+EPOLLET： 将EPOLL设为边缘触发(Edge Triggered)模式，这是相对于水平触发(Level Triggered)来说的。
+EPOLLONESHOT：只监听一次事件，当监听完这次事件之后，如果还需要继续监听这个socket的话，需要再次把这个socket加入到EPOLL队列里
+
+7.epoll方法
+int epoll_create(int size);
+创建一个epoll的句柄。自从linux2.6.8之后，size参数是被忽略的。需要注意的是，当创建好epoll句柄后，它就是会占用一个fd值，在linux下如果查看/proc/进程id/fd/，是能够看到这个fd的，所以在使用完epoll后，必须调用close()关闭，否则可能导致fd被耗尽。
+
+int epoll_ctl(int epfd, int op, int fd, struct epoll_event *event);
+epoll的事件注册函数，它不同于select()是在监听事件时告诉内核要监听什么类型的事件，而是在这里先注册要监听的事件类型。
+第一个参数是epoll_create()的返回值。
+第二个参数表示动作，用三个宏来表示：
+EPOLL_CTL_ADD：注册新的fd到epfd中；
+EPOLL_CTL_MOD：修改已经注册的fd的监听事件；
+EPOLL_CTL_DEL：从epfd中删除一个fd；
+第三个参数是需要监听的fd。
+第四个参数是告诉内核需要监听什么事 具体见 '数据结构'
+
+int epoll_wait(int epfd, struct epoll_event * events, int maxevents, int timeout);
+收集在epoll监控的事件中已经发送的事件。参数events是分配好的epoll_event结构体数组，epoll将会把发生的事件赋值到events数组中（events不可以是空指针，内核只负责把数据复制到这个events数组中，不会去帮助我们在用户态中分配内存）。maxevents告之内核这个events有多大，这个 maxevents的值不能大于创建epoll_create()时的size，参数timeout是超时时间（毫秒，0会立即返回，-1将不确定，也有说法说是永久阻塞）。如果函数调用成功，返回对应I/O上已准备好的文件描述符数目，如返回0表示已超时

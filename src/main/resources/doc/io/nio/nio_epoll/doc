@@ -1,0 +1,12 @@
+Epoll Linux 2.6之后的NIO实现
+
+简介:
+https://www.zhihu.com/question/20122137
+
+epoll API文档以及介绍:
+https://blog.csdn.net/xiajun07061225/article/details/9250579
+
+
+3.主要的实现在
+EPollSelectorImpl
+EPollArrayWrapper
