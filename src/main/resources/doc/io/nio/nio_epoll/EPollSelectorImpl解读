@@ -1,0 +1,65 @@
+EPollSelectorImpl解读
+
+1.基于EPoll实现的Selector,不过但不是真正内核函数的空间都是在EPollArrayWrapper
+
+2.其中的方法和控制都和 KQueueSelectorImpl类似,参考《KQueueSelectorImpl 解读》以下分析
+一下 doSelect
+
+protected int doSelect(long timeout) throws IOException {
+    if (closed)
+        throw new ClosedSelectorException();
+
+    //清理已经取消的key
+    processDeregisterQueue();
+    try {
+        begin();
+        //参考 《EPollArrayWrapper解读》
+        pollWrapper.poll(timeout);
+    } finally {
+        end();
+    }
+    processDeregisterQueue();
+
+    //获取被触发的SelectionKey 在updateSelectedKeys中已经把被触发的key都放入到了
+    //selectedKeys中
+    int numKeysUpdated = updateSelectedKeys();
+    if (pollWrapper.interrupted()) {
+        //清理中断状态
+        pollWrapper.putEventOps(pollWrapper.interruptedIndex(), 0);
+        synchronized (interruptLock) {
+            pollWrapper.clearInterrupted();
+            IOUtil.drain(fd0);
+            interruptTriggered = false;
+        }
+    }
+    //返回给上层
+    return numKeysUpdated;
+}
+private int updateSelectedKeys() {
+    //在poll中进行了updated字段的更新
+    int entries = pollWrapper.updated;
+    int numKeysUpdated = 0;
+    for (int i=0; i<entries; i++) {
+        //这里获取的都是事件被触发的
+        int nextFD = pollWrapper.getDescriptor(i);
+        SelectionKeyImpl ski = fdToKey.get(Integer.valueOf(nextFD));
+        // ski is null in the case of an interrupt
+        if (ski != null) {
+            //事件
+            int rOps = pollWrapper.getEventOps(i);
+            //下面就是对被触发事件的处理
+            if (selectedKeys.contains(ski)) {
+                if (ski.channel.translateAndSetReadyOps(rOps, ski)) {
+                    numKeysUpdated++;
+                }
+            } else {
+                ski.channel.translateAndSetReadyOps(rOps, ski);
+                if ((ski.nioReadyOps() & ski.nioInterestOps()) != 0) {
+                    selectedKeys.add(ski);
+                    numKeysUpdated++;
+                }
+            }
+        }
+    }
+    return numKeysUpdated;
+}

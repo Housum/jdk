@@ -105,11 +105,13 @@ void updateRegistrations() {
 关闭该kqueue内核队列
 void close() throws IOException {
     if (this.keventArray != null) {
+        //清理内存
         this.keventArray.free();
         this.keventArray = null;
     }
 
     if (this.kq >= 0) {
+        //关闭文件描述符
         FileDispatcherImpl.closeIntFD(this.kq);
         this.kq = -1;
     }

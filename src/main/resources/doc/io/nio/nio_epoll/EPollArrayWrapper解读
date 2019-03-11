@@ -8,19 +8,20 @@ EPollArrayWrapper解读
 https://lobin.iteye.com/blog/2324629
 
 3.调用流程
-EPollSelectorImpl注册 调用add方法,将关联的channel的文件描述符保存在数据中->将文件描述符的事件通过setInterest
+EPollSelectorImpl注册SelectionKey调用add方法,将关联的channel的文件描述符保存在数据中->将文件描述符的事件通过setInterest
 进行设置,将文件描述符和事件关联上-> selector调用doSelect,然后调用poll,这个时候才真正的将文件描述符的事件注册到
-epoll内核队列中, 并且查看内核队列中是否有事件发生
+epoll内核队列中, 然后查看内核队列中是否有事件发生将放入到内部分配的内存中
 
 
 4.方法分析
-大致和KQueue类型,将按照注册,触发,反注册,和关系分析
+大致和KQueue类型,将按照注册,触发,反注册,和关闭一一分析
 注册:
 在调用register的时候调用 将关联的channel的文件描述符传入
 void add(int fd) {
     // force the initial update events to 0 as it may be KILLED by a
     // previous registration.
     synchronized (updateLock) {
+        //之前没有注册过
         assert !registered.get(fd);
         //先将其设置为0 因为可能已经存在了 并且被remove掉了
         setUpdateEvents(fd, (byte)0, true);
@@ -53,6 +54,7 @@ void setInterest(int fd, int mask) {
             System.arraycopy(updateDescriptors, 0, newDescriptors, 0, oldCapacity);
             updateDescriptors = newDescriptors;
         }
+        //这其中保存了所有的描述符 之后真正将时间注册到内核队列中
         updateDescriptors[updateCount++] = fd;
 
         // events are stored as bytes for efficiency reasons
@@ -62,11 +64,78 @@ void setInterest(int fd, int mask) {
         setUpdateEvents(fd, b, false);
     }
 }
+
 触发:
+int poll(long timeout) throws IOException {
+    //第一步还是将fd和相应的时间注册到内核队列中
+    updateRegistrations();
+    //等待事件被触发 具体的内核函数可以参考下面
+    //返回的是被触发的事件 pollArrayAddress是内存的指针 事件将会被放入其中
+    updated = epollWait(pollArrayAddress, NUM_EPOLLEVENTS, timeout, epfd);
+    for (int i=0; i<updated; i++) {
+        //这里是否有中断文件描述符被触发
+        if (getDescriptor(i) == incomingInterruptFD) {
+            interruptedIndex = i;
+            interrupted = true;
+            break;
+        }
+    }
+    //返回触发的事件(其中被触发的时间已经被放到了起始地址为pollArrayAddress的内存中)
+    return updated;
+}
+//这部分就是将fd和对应的事件进行注册
+private void updateRegistrations() {
+        synchronized (updateLock) {
+            int j = 0;
+            //updateCount 在注册的时候保存之后都会增加updateCount(其实就是updateDescriptors数组的索引)
+            while (j < updateCount) {
+                //将fd和事件都注册到内核队列中去
+                int fd = updateDescriptors[j];
+                //之前是将fd关联的事件放到了数组或者map中去了
+                short events = getUpdateEvents(fd);
+                //是否之前注册过 如果注册过的话 那么再次注册的话就是
+                //修改事件了(内核事件的EPOLL_CTL_MOD)
+                boolean isRegistered = registered.get(fd);
+                int opcode = 0;
 
+                if (events != KILLED) {
+                   //events为0的情况下 反注册事件
+                    if (isRegistered) {
+                        opcode = (events != 0) ? EPOLL_CTL_MOD : EPOLL_CTL_DEL;
+                    } else {
+                        opcode = (events != 0) ? EPOLL_CTL_ADD : 0;
+                    }
+                    if (opcode != 0) {
+                        //进行事件的注册
+                        epollCtl(epfd, opcode, fd, events);
+                        //判断事件的行为
+                        if (opcode == EPOLL_CTL_ADD) {
+                            registered.set(fd);
+                        } else if (opcode == EPOLL_CTL_DEL) {
+                            registered.clear(fd);
+                        }
+                    }
+                }
+                j++;
+            }
+            //事件注册之后 将updateCount清理掉 即为逻辑上的清理掉数组中的内容
+            updateCount = 0;
+        }
+}
 
+关闭:
+void closeEPollFD() throws IOException {
+    //关闭文件描述符
+    FileDispatcherImpl.closeIntFD(epfd);
+    //释放内存
+    pollArray.free();
+}
 
-
+中断:
+参考KQueue
+public void interrupt() {
+    interrupt(outgoingInterruptFD);
+}
 
 
 
@@ -75,9 +144,12 @@ private final byte[] eventsLow = new byte[MAX_UPDATE_ARRAY_SIZE];
 private Map<Integer,Byte> eventsHigh;
 这两个都是为了保存文件描述符的 当文件描述符小于MAX_UPDATE_ARRAY_SIZE 放在eventsLow中
 当大于的时候放在eventsHigh中,eventsLow 索引放的是文件描述符 值放的是事件. eventsHigh key
-保存的是文件描述符 值放的是事件
+保存的是文件描述符 value放的是事件
 
-
+private int updateCount;
+添加的fd数量
+private int[] updateDescriptors = new int[INITIAL_PENDING_UPDATE_SIZE];
+添加的fd updateDescriptors.length = updateCount
 
 
 6.epoll数据结构
@@ -104,7 +176,8 @@ EPOLLONESHOT：只监听一次事件，当监听完这次事件之后，如果�
 
 7.epoll方法
 int epoll_create(int size);
-创建一个epoll的句柄。自从linux2.6.8之后，size参数是被忽略的。需要注意的是，当创建好epoll句柄后，它就是会占用一个fd值，在linux下如果查看/proc/进程id/fd/，是能够看到这个fd的，所以在使用完epoll后，必须调用close()关闭，否则可能导致fd被耗尽。
+创建一个epoll的句柄。自从linux2.6.8之后，size参数是被忽略的。需要注意的是，当创建好epoll句柄后，它就是会占用一个fd值，在linux下如果查看/proc/进程id/fd/，
+是能够看到这个fd的，所以在使用完epoll后，必须调用close()关闭，否则可能导致fd被耗尽。
 
 int epoll_ctl(int epfd, int op, int fd, struct epoll_event *event);
 epoll的事件注册函数，它不同于select()是在监听事件时告诉内核要监听什么类型的事件，而是在这里先注册要监听的事件类型。
@@ -117,4 +190,7 @@ EPOLL_CTL_DEL：从epfd中删除一个fd；
 第四个参数是告诉内核需要监听什么事 具体见 '数据结构'
 
 int epoll_wait(int epfd, struct epoll_event * events, int maxevents, int timeout);
-收集在epoll监控的事件中已经发送的事件。参数events是分配好的epoll_event结构体数组，epoll将会把发生的事件赋值到events数组中（events不可以是空指针，内核只负责把数据复制到这个events数组中，不会去帮助我们在用户态中分配内存）。maxevents告之内核这个events有多大，这个 maxevents的值不能大于创建epoll_create()时的size，参数timeout是超时时间（毫秒，0会立即返回，-1将不确定，也有说法说是永久阻塞）。如果函数调用成功，返回对应I/O上已准备好的文件描述符数目，如返回0表示已超时
+收集在epoll监控的事件中已经发送的事件。参数events是分配好的epoll_event结构体数组，epoll将会把发生的事件赋值到events数组中
+（events不可以是空指针，内核只负责把数据复制到这个events数组中，不会去帮助我们在用户态中分配内存）。maxevents告之内核这个events有多大，
+这个 maxevents的值不能大于创建epoll_create()时的size，参数timeout是超时时间（毫秒，0会立即返回，-1将不确定，也有说法说是永久阻塞）。
+如果函数调用成功，返回对应I/O上已准备好的文件描述符数目，如返回0表示已超时
