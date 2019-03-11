@@ -1,0 +1,6 @@
+select:
+https://www.zhihu.com/question/20122137
+
+Windows采用的是select的方式,但是是启动多个线程去并发的获取事件
+
+
