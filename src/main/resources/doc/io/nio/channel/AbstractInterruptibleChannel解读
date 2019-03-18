@@ -1,0 +1,95 @@
+AbstractInterruptibleChannel 解读
+
+1.该抽象类提供了基础的中断原子处理方法,begin以及end,子类需要在实现堵塞的方法前面成对的使用
+已达到实现可中断的channel:
+try {
+      begin();
+      completed = ...;    // Perform blocking I/O operation
+      return ...;         // Return result
+  } finally {
+      end(completed);
+}
+基本上上面完成那些事呢? 如果中断记录被中断的线程,在end中判断被中断的线程是否是当前线程,如果是的话
+那么抛出InterruptiableChannel中定义的ClosedByInterruptException异常. 如果是没有被中断,但是completed
+返回了未完成,但是此时已经被关闭了,那么将会抛出AsynchronousCloseException,异步被关闭
+
+
+2.属性分析
+private final Object closeLock = new Object()
+关闭操作的锁
+
+private volatile boolean open = true
+标示该channel是否关闭了,操作的时候由closeLock进行加锁
+
+private Interruptible interruptor
+线程的的Interruptible blocker,见Thread(在Thread的 interrupt方法被调用的时候blocker将会被执行)
+
+private volatile Thread interrupted
+记录被中断的线程,详情见interruptor初始化内部逻辑,内部的逻辑是
+将被中断的线程赋值给interrupted
+
+
+3.方法分析
+关闭操作
+public final void close() throws IOException {
+    synchronized (closeLock) {
+        //如果已经被关闭了的话 那么直接返回
+        if (!open)
+            return;
+        open = false;
+        //子类实现的方法 注意 子类实现的时候不需要加锁了 因为上层已经加了
+        implCloseChannel();
+    }
+}
+
+抽象方法 做真正意思上的关闭操作,约定:子类需要将那些所有堵塞的线程立即返回或者抛出异常
+protected abstract void implCloseChannel() throws IOException
+
+堵塞方法开始部分
+protected final void begin() {
+    //如果interruptor为空 那么进行初始化
+    if (interruptor == null) {
+        interruptor = new Interruptible() {
+                public void interrupt(Thread target) {
+                    synchronized (closeLock) {
+                        if (!open)
+                            return;
+                        open = false;
+                        interrupted = target;
+                        try {
+                            AbstractInterruptibleChannel.this.implCloseChannel();
+                        } catch (IOException x) { }
+                    }
+                }};
+    }
+    //这步就是将Interruptible设置为Thread的blocker
+    blockedOn(interruptor);
+
+    //如果线程在调用的时候 中断状态已经被设置了 那么直接执行中断逻辑
+    Thread me = Thread.currentThread();
+    if (me.isInterrupted())
+        interruptor.interrupt(me);
+}
+
+堵塞之后
+protected final void end(boolean completed)
+        throws AsynchronousCloseException
+    {
+        //将Thread的blocker清空
+        blockedOn(null);
+        Thread interrupted = this.interrupted;
+        //这里就是判断是不是本线程被中断了(因为interrupted是在Interruptible被调用的时候
+        //设置的,而内部做的就是interrupted = target,这个target是Thread传入的this)
+        if (interrupted != null && interrupted == Thread.currentThread()) {
+            interrupted = null;
+            //抛出异常
+            throw new ClosedByInterruptException();
+        }
+        //如果没有操作完成的话 那么抛出AsynchronousCloseException
+        if (!completed && !open)
+            throw new AsynchronousCloseException();
+}
+
+
+
+

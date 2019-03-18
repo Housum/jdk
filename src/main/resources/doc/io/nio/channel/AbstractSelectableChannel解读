@@ -1,0 +1,169 @@
+AbstractSelectableChannel解读
+
+1.SelectableChannel的抽象实现,实现了注册和反注册的方法,和关闭方法. 对于基类定义需要同步的方法
+该抽象方法都实现了,所以子类不需要去再去加锁.
+
+2.属性
+private final SelectorProvider provider
+创建该Channel的SelectorProvider,在NIO中采用的是SPI的方式,不同的平台实现不同的提供者,里面提供了返回
+不同的channel和selector
+
+private SelectionKey[] keys = null
+private int keyCount = 0
+private final Object keyLock = new Object()
+涉及到注册到selector的SelectionKey,通过数组进行保存,在关闭channel的时候也需要对这部分keys操作
+keyCount为总数,keyLock为加锁的对象
+
+private final Object regLock = new Object()
+在注册的时候以及configureBlocking的时候作为加锁对象
+
+boolean blocking = true;
+堵塞的模式
+
+3.方法分析
+将根据基类定义的抽象方法进行分析,详情见《SelectableChannel解读》
+
+返回提供者
+public final SelectorProvider provider() {
+        return provider;
+}
+
+查询channel是否有在给定的selector进行注册
+public final SelectionKey keyFor(Selector sel) {
+    //内部方法
+    return findKey(sel);
+}
+//查询内部的keys方法
+private SelectionKey findKey(Selector sel) {
+    synchronized (keyLock) {
+        if (keys == null)
+            return null;
+        //遍历已经注册的
+        for (int i = 0; i < keys.length; i++)
+            //如果存在的话 那么返回
+            if ((keys[i] != null) && (keys[i].selector() == sel))
+                return keys[i];
+        return null;
+    }
+}
+
+将channel注册到selector上面
+public final SelectionKey register(Selector sel, int ops,
+                                       Object att)
+        throws ClosedChannelException
+    {
+       //可以看到这里是进行加锁的 所以当同一个channel同时注册到多个selector上面的话
+       //那么就被堵塞直到锁被释放
+        synchronized (regLock) {
+            if (!isOpen())
+                throw new ClosedChannelException();
+            //validOps方法在该抽象类中还没有被实现 在后面具体的类实现
+            //判断注册的事件是不是满足 不满足的话 抛出异常
+            if ((ops & ~validOps()) != 0)
+                throw new IllegalArgumentException();
+
+           //只能处于非堵塞的情况下 如果是堵塞模式的话 那么将会抛出异常
+            if (blocking)
+                throw new IllegalBlockingModeException();
+            //查询是否注册过 如果注册过的话 那么就更新ops和att
+            SelectionKey k = findKey(sel);
+            if (k != null) {
+                k.interestOps(ops);
+                k.attach(att);
+            }
+            //如果是增加的话 那么进行初始化
+            if (k == null) {
+                // New registration
+                synchronized (keyLock) {
+                    if (!isOpen())
+                        throw new ClosedChannelException();
+                    //调用selector的注册方法  见: 《doc/io/nio/SelectorImpl解读:91》
+                    k = ((AbstractSelector)sel).register(this, ops, att);
+
+                    //将key加入到channel的keys中
+                    addKey(k);
+                }
+            }
+            return k;
+        }
+}
+新增key到keys数组中
+private void addKey(SelectionKey k) {
+        //这里进行判断 是否持有锁
+        assert Thread.holdsLock(keyLock);
+        int i = 0;
+        if ((keys != null) && (keyCount < keys.length)) {
+            //直到数组中没有存放元素的索引,arr[i] 后面进行赋值
+            for (i = 0; i < keys.length; i++)
+                if (keys[i] == null)
+                    break;
+        } else if (keys == null) {
+           //如果是第一次的话 那么进行初始化
+            keys =  new SelectionKey[3];
+        } else {
+            // Grow key array
+            //如果容量不够的话 那么扩容2倍
+            int n = keys.length * 2;
+            SelectionKey[] ks =  new SelectionKey[n];
+            //拷贝元素到新的数组中(多出来的都为null,也就是第一步部分查询出为null的索引)
+            for (i = 0; i < keys.length; i++)
+                ks[i] = keys[i];
+            keys = ks;
+            i = keyCount;
+        }
+        //赋值
+        keys[i] = k;
+        //增加计数
+        keyCount++;
+}
+
+设置堵塞模式
+public final SelectableChannel configureBlocking(boolean block)
+    throws IOException
+{
+    //见 register,使用的是同一个锁 这里也满足了 SelectableChannel中的定义
+    synchronized (regLock) {
+        if (!isOpen())
+            throw new ClosedChannelException();
+        //如果已经设置过了 那么直接返回
+        if (blocking == block)
+            return this;
+        //如果之前是非堵塞的话 那么在注册之后就不能被设置了,除非
+        //被解注册了,这也刚好满足SelectableChannel中的定义
+        if (block && haveValidKeys())
+            throw new IllegalBlockingModeException();
+       //子类还需要实现自己的逻辑
+        implConfigureBlocking(block);
+        blocking = block;
+    }
+    return this;
+}
+判断是否有有效的key
+private boolean haveValidKeys() {
+    synchronized (keyLock) {
+        if (keyCount == 0)
+            return false;
+            //遍历 判断是否还有有效的key
+        for (int i = 0; i < keys.length; i++) {
+            if ((keys[i] != null) && keys[i].isValid())
+                return true;
+        }
+        return false;
+    }
+}
+
+其他方法
+
+package access的
+void removeKey(SelectionKey k) {                    // package-private
+    synchronized (keyLock) {
+        for (int i = 0; i < keys.length; i++)
+            //移除key
+            if (keys[i] == k) {
+                keys[i] = null;
+                keyCount--;
+            }
+            //调用其失效的方法 内部将其设置为失效
+        ((AbstractSelectionKey)k).invalidate();
+    }
+}

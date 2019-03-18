@@ -1,0 +1,28 @@
+ServerSocketChannel解读
+
+1.面向流的,监听socket的channel.该对象是抽象的, 创建该对象是通过open方法进行创建的,但是在创建之后
+并没有绑定本地的地址,所以还需要是用bind方法进行绑定. 通过accept方法获取连接.
+
+2.方法分析
+创建一个实例,底层是通过SPI实现的
+public static ServerSocketChannel open() throws IOException {
+    return SelectorProvider.provider().openServerSocketChannel();
+}
+
+返回有效的事件 对于ServerSocketChannel只支持监听事件,也就是只做监听的工作
+public final int validOps() {
+        return SelectionKey.OP_ACCEPT;
+}
+
+3.定义抽象方法子类实现
+
+public abstract ServerSocketChannel bind(SocketAddress local, int backlog)
+    throws IOException
+将socket绑定到本地上,backlog表示最大能够接受的连接,根据不同的实现可能并不一定其效果,
+如果是0或者负数的话,那么采用的是不同实现的默认值
+
+public abstract ServerSocket socket()
+返回和ServerSocketChannel的ServerSocket
+
+public abstract SocketChannel accept() throws IOException
+接受新连接,必须在bind本地之后才能够私用accept,如果是非堵塞的模式下,那么有可能返回null

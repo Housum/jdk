@@ -13,8 +13,8 @@ try {
 用来处理堵塞的中断
 
 2.方法分析
-取消SelectionKey 这里只是取消了SelectionKey但是将其移除是在
-后面的select的时候进行移除的. 具体见sun.nio.ch.SelectorImpl.processDeregisterQueue
+取消SelectionKey 这里只是取消了SelectionKey,但是将其从keys集合中移除是在
+后面的select操作的时候进行移除的. 具体见sun.nio.ch.SelectorImpl.processDeregisterQueue
 void cancel(SelectionKey k) {
     synchronized (cancelledKeys) {
         cancelledKeys.add(k);
@@ -23,6 +23,7 @@ void cancel(SelectionKey k) {
 
 关闭Selector
 public final void close() throws IOException {
+    //采用cas的方式
     boolean open = selectorOpen.getAndSet(false);
     if (!open)
         return;
@@ -41,7 +42,7 @@ protected final void deregister(AbstractSelectionKey key) {
 }
 
 
-3.中断机制
+3.中断机制 开始
 protected final void begin() {
     //这里设置interruptor 是为了保存中断的中断器
     if (interruptor == null) {
@@ -55,13 +56,15 @@ protected final void begin() {
     //这里的设置 最后提现在java.lang.Thread.blocker
     AbstractInterruptibleChannel.blockedOn(interruptor);
     Thread me = Thread.currentThread();
+
+    //如果调用的线程中断状态在调用之前已经被设置了 那么
+    //调用的时候直接被中断 该selector被关闭
     if (me.isInterrupted())
-        //先尝试将当前的堵塞的状态给唤醒
         interruptor.interrupt(me);
 }
 
 protected final void end() {
-    //将当前线程的java.lang.Thread.blocker设置为null
+    //将当前线程的java.lang.Thread.blocker设置为null,结束中断了
     AbstractInterruptibleChannel.blockedOn(null);
 }
 

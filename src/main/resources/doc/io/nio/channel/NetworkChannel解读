@@ -1,0 +1,22 @@
+NetworkChannel解读
+
+1.定义了网络的Channel,定义了绑定地址的方法以及设置Socket参数的方法.
+所有的网络方面的channel都需要实现该接口
+
+2.接口定义方法
+NetworkChannel bind(SocketAddress local) throws IOException
+将socket通道绑定到本地的地址上,一旦绑定上了之后就就一直保存状态
+
+SocketAddress getLocalAddress() throws IOException
+返回订单的地址,如果是网络协议下 那么返回InetSocketAddress
+
+<T> NetworkChannel setOption(SocketOption<T> name, T value) throws IOException
+设置Socket参数
+
+<T> T getOption(SocketOption<T> name) throws IOException
+获取Socket参数
+
+Set<SocketOption<?>> supportedOptions()
+这个方法返回的时候 当前的channel支持的Socket参数
+
+

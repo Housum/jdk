@@ -267,8 +267,8 @@ public class JDKTest<K extends Object & Map, V> implements Serializable {
                 e.printStackTrace();
             }
         }).start();
-        TimeUnit.SECONDS.sleep(2);
-        testSocketServer();
+//        TimeUnit.SECONDS.sleep(2);
+//        testSocketServer();
     }
 
 

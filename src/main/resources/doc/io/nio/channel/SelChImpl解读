@@ -1,0 +1,26 @@
+SelChImpl解读
+
+1.该接口主要的作用是提供了可以设置不同的状态的事件,以及关闭Channel的方法
+
+2.方法
+
+FileDescriptor getFD()
+返回该channel的文件描述符
+
+int getFDVal()
+返回文件描述符的数字表示方式
+
+public boolean translateAndUpdateReadyOps(int ops, SelectionKeyImpl sk)
+更新SelectionKey已经被触发的事件
+
+public boolean translateAndSetReadyOps(int ops, SelectionKeyImpl sk)
+设置SelectionKey已经被触发的事件
+
+void translateAndSetInterestOps(int ops, SelectionKeyImpl sk)
+设置事件
+
+int validOps()
+返回有效的ops
+
+void kill() throws IOException
+关闭channel(清理物理层的文件描述符等等)

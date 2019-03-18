@@ -1,0 +1,51 @@
+SelectableChannel解读
+
+1.这个才是NIO的重点0-0,因为该抽象类定义了多路复用的功能,该channel提供了注册Selector的功能,而
+Selector本身实现了多路复用的功能(不同平台实现的方式不同,详情见nio_epoll,nio_kqueue,nio_select).
+在注册的时候将会返回一个SelectionKey,代表了当前的channel以及相关的事件.
+
+一旦注册之后,那么将会一直保持这个状态直到被解注册了,同时channel并不能被直接的解注册,只能是
+通过close方法进行关闭的时候被解注册.或者通过关联的SelectionKey可以通过其cancel方法解注册.
+
+channel所有的SelectionKey会被会被解注册当close的时候
+
+对于同一个selector,一个channel只能够注册一次. isRegistered可以返回当前的channel是否
+有注册的selector
+
+堵塞模式:
+可以通过方法configureBlocking(boolean block)设置堵塞的模式,默认是堵塞的,非堵塞的情况下
+IO操作不会一直堵塞直到所有的数据都到来,而是就到部分的数据然后就返回. channel必须在register之前被设置为
+非堵塞,否则的话只能等待被解注册的时候 才能进行设置了
+
+
+2.抽象方法定义
+
+public abstract SelectorProvider provider()
+返回SelectorProvider(nio的SPI,提供了不同的平台实现)
+
+public abstract int validOps()
+返回可以设置的事件,具体见: SelectionKey的常量
+
+public abstract SelectionKey keyFor(Selector sel)
+返回注册到指定的selector的SelectionKey,如果没有注册的话,那么返回null
+
+public abstract SelectionKey register(Selector sel, int ops, Object att)throws ClosedChannelException
+将channel注册到selector上面,ops就是注册的事件,att表示的是附带的对象
+如果是对于该同一个selector不是首次注册的话,那么就更新ops,如果att不为空的话那么就会替换对象,并且返回之前的SelectionKey
+因为底层在实现的时候,设置堵塞模式和注册的时候都使用了同一个锁,所以在注册的时候是被加锁的,所有有可能会被堵塞直到其他的
+线程被完成
+
+public abstract SelectableChannel configureBlocking(boolean block)throws IOException
+设置堵塞的模式,如果该channel在之前的已经注册过其他的selector,但是后面注册其他selector的时候切换堵塞模式,那么就就
+抛出IllegalBlockingModeException异常
+
+public abstract boolean isBlocking()
+返回是否堵塞的模式
+
+public abstract Object blockingLock()
+返回堵塞的锁,返回的锁将会使用在register和configureBlocking中被使用,所以这部分是只能同步执行
+
+
+
+
+

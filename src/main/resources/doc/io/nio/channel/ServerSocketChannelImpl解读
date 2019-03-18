@@ -1,0 +1,289 @@
+ServerSocketChannelImpl解读
+
+源码:
+https://github.com/frohoff/jdk8u-dev-jdk/blob/da0da73ab82ed714dc5be94acd2f0d00fbdfe2e9/src/share/classes/sun/nio/ch/ServerSocketChannelImpl.java
+accept 内核函数:
+https://blog.csdn.net/dengjin20104042056/article/details/52357452
+http://www.cnblogs.com/jiangzhaowei/p/8261174.html
+TCP参数:
+https://blog.csdn.net/jasonliuvip/article/details/22591531
+https://blog.csdn.net/ctthuangcheng/article/details/9448519
+Net.c:
+https://github.com/Cosmic-OS/platform_libcore/blob/31743e141c277387c4d28ae6cc777703945a35eb/ojluni/src/main/native/Net.c
+ServerSocketChannelImpl.c:
+https://github.com/Cosmic-OS/platform_libcore/blob/31743e141c277387c4d28ae6cc777703945a35eb/ojluni/src/main/native/ServerSocketChannelImpl.c
+IOUtil.c:
+https://github.com/Cosmic-OS/platform_libcore/blob/31743e141c277387c4d28ae6cc777703945a35eb/ojluni/src/main/native/IOUtil.c
+
+1.ServerSocketChannel的实现
+使用底层socket内核函数初始化一个socket()并且返回文件描述符,然后通过内核函数bind() 绑定指定的ip和端口,最后在调用类的
+accept方法的时候使用内核函数listen()监听socket连接,当监听到新的连接来到的时候,使用其连接的描述符初始化一个SocketChanel返回
+
+2.属性分析
+
+private int fdVal
+该类的文件描述符
+
+private volatile long thread = 0
+堵塞线程的ID，见accept方法: thread = NativeThread.current()
+
+private final Object lock = new Object()
+accept方法的锁对象,线程使用独占的方式使用accept方法获得新的连接
+
+private final Object stateLock = new Object()
+所有修改状态的方法都使用该对象锁进行加锁, 以下 为被加锁的对象
+
+静态常量:
+该Channel socket连接所处的状态
+private static final int ST_UNINITIALIZED = -1; // 未初始化
+private static final int ST_INUSE = 0; //使用中
+private static final int ST_KILLED = 1; //被关闭了
+
+private int state = ST_UNINITIALIZED
+初始化的状态为为初始化
+
+private InetSocketAddress localAddress
+绑定的socket地址
+
+private boolean isReuseAddress
+当前处于独占状态(https://docs.microsoft.com/zh-cn/windows/desktop/WinSock/using-so-reuseaddr-and-so-exclusiveaddruse#using-so_exclusiveaddruse)
+的时候,使用该属性模拟实现
+
+ServerSocket socket
+这是懒加载的,如果调用过的话,对SocketServerChannel进行适配
+
+
+3.方法分析
+按照启动流程分析
+
+构造方法:
+ServerSocketChannelImpl(SelectorProvider var1) throws IOException {
+    //设置SelectorProvider
+    super(var1);
+    //内存使用socket()创建一个socket描述符
+    this.fd = Net.serverSocket(true);
+    //返回上面文件描述符的数字表示
+    this.fdVal = IOUtil.fdVal(this.fd);
+    this.state = 0;
+}
+
+设置IP协议的值
+public <T> ServerSocketChannel setOption(SocketOption<T> var1, T var2) throws IOException {
+        if (var1 == null) {
+            throw new NullPointerException();
+        } else if (!this.supportedOptions().contains(var1)) {
+            throw new UnsupportedOperationException("'" + var1 + "' not supported");
+        } else {
+            //如属性中描述的 使用stateLock进行加锁
+            synchronized(this.stateLock) {
+                if (!this.isOpen()) {
+                    throw new ClosedChannelException();
+                } else if (var1 == StandardSocketOptions.IP_TOS) {
+                    //具体IP_TOS 可以参考
+                    StandardProtocolFamily var4 = Net.isIPv6Available() ? StandardProtocolFamily.INET6 : StandardProtocolFamily.INET;
+                    Net.setSocketOption(this.fd, var4, var1, var2);
+                    return this;
+                } else {
+                    //并不调用内核函数 而是直接使用字段进行模拟
+                    if (var1 == StandardSocketOptions.SO_REUSEADDR && Net.useExclusiveBind()) {
+                        this.isReuseAddress = (Boolean)var2;
+                    } else {
+                        //进行设置IP参数
+                        Net.setSocketOption(this.fd, Net.UNSPEC, var1, var2);
+                    }
+                    return this;
+                }
+            }
+        }
+}
+获取参数
+public <T> T getOption(SocketOption<T> var1) throws IOException {
+        if (var1 == null) {
+            throw new NullPointerException();
+        } else if (!this.supportedOptions().contains(var1)) {
+            throw new UnsupportedOperationException("'" + var1 + "' not supported");
+        } else {
+            synchronized(this.stateLock) {
+                if (!this.isOpen()) {
+                    throw new ClosedChannelException();
+                } else {
+                    return var1 == StandardSocketOptions.SO_REUSEADDR && Net.useExclusiveBind() ? this.isReuseAddress : Net.getSocketOption(this.fd, Net.UNSPEC, var1);
+                }
+            }
+        }
+}
+
+支持的参数
+public final Set<SocketOption<?>> supportedOptions() {
+    return ServerSocketChannelImpl.DefaultOptionsHolder.defaultOptions;
+}
+默认支持的参数
+使用了懒加载模式==
+private static class DefaultOptionsHolder {
+        static final Set<SocketOption<?>> defaultOptions = defaultOptions();
+
+        private DefaultOptionsHolder() {
+        }
+
+        private static Set<SocketOption<?>> defaultOptions() {
+            HashSet var0 = new HashSet(2);
+            var0.add(StandardSocketOptions.SO_RCVBUF);
+            var0.add(StandardSocketOptions.SO_REUSEADDR);
+            var0.add(StandardSocketOptions.IP_TOS);
+            return Collections.unmodifiableSet(var0);
+        }
+}
+
+检测是否已经绑定了
+public boolean isBound() {
+    synchronized(this.stateLock) {
+        return this.localAddress != null;
+    }
+}
+绑定:
+public ServerSocketChannel bind(SocketAddress var1, int var2) throws IOException {
+        //绑定的时候进行加锁
+        synchronized(this.lock) {
+            if (!this.isOpen()) {
+                throw new ClosedChannelException();
+            } else if (this.isBound()) {
+                throw new AlreadyBoundException();
+            } else {
+                //0 表示随机生成一个没有被使用的本地端口
+                InetSocketAddress var4 = var1 == null ? new InetSocketAddress(0) : Net.checkAddress(var1);
+                SecurityManager var5 = System.getSecurityManager();
+                if (var5 != null) {
+                    var5.checkListen(var4.getPort());
+                }
+
+                NetHooks.beforeTcpBind(this.fd, var4.getAddress(), var4.getPort());
+                //socket()创建了socket文件描述符的时候并没有分配一个地址 所以需要调用内核函数
+                //bind绑定一个地址
+                Net.bind(this.fd, var4.getAddress(), var4.getPort());
+                //socket()函数创建的socket默认是一个主动类型的，listen函数将socket变为被动类型的，等待客户的连接请求。
+                Net.listen(this.fd, var2 < 1 ? 50 : var2);
+                synchronized(this.stateLock) {
+                    //设置地址
+                    this.localAddress = Net.localAddress(this.fd);
+                }
+                return this;
+            }
+        }
+}
+
+监听连接
+public SocketChannel accept() throws IOException {
+        synchronized(this.lock) {
+            if (!this.isOpen()) {
+                throw new ClosedChannelException();
+            } else if (!this.isBound()) {
+                throw new NotYetBoundException();
+            } else {
+                SocketChannelImpl var2 = null;
+                int var3 = 0;
+                //储存新建连接的文件描述符
+                FileDescriptor var4 = new FileDescriptor();
+                InetSocketAddress[] var5 = new InetSocketAddress[1];
+
+                InetSocketAddress var6;
+                try {
+                    this.begin();
+                    if (!this.isOpen()) {
+                        var6 = null;
+                        return var6;
+                    }
+
+                    //当前线程的ID
+                    this.thread = NativeThread.current();
+                    do {
+                        //调用内核函数 accept
+                        var3 = this.accept(this.fd, var4, var5);
+                        //-3表示的是没有连接
+                    } while(var3 == -3 && this.isOpen());
+                } finally {
+                    this.thread = 0L;
+                    this.end(var3 > 0);
+                    assert IOStatus.check(var3);
+
+                }
+
+                if (var3 < 1) {
+                    return null;
+                } else {
+                    //注意这里 创建的所有连接都是非堵塞的
+                    IOUtil.configureBlocking(var4, true);
+                    var6 = var5[0];
+                    //创建一个SocketChannel连接
+                    var2 = new SocketChannelImpl(this.provider(), var4, var6);
+                    SecurityManager var7 = System.getSecurityManager();
+                    if (var7 != null) {
+                        try {
+                            var7.checkAccept(var6.getAddress().getHostAddress(), var6.getPort());
+                        } catch (SecurityException var13) {
+                            var2.close();
+                            throw var13;
+                        }
+                    }
+                    return var2;
+                }
+            }
+        }
+}
+
+设置已经触发的事件 在selector最底层的实现中 当有新的事件被触发的时候
+进行SelectionKey的readyOps的设置
+见：doc/io/nio/nio_epoll/EPollSelectorImpl解读:38
+doc/io/nio/nio_kqueue/KQueueSelectorImpl解读:71
+public boolean translateAndSetReadyOps(int ops, SelectionKeyImpl sk) {
+        return translateReadyOps(ops, 0, sk);
+}
+public boolean translateAndUpdateReadyOps(int ops, SelectionKeyImpl sk) {
+    return translateReadyOps(ops, sk.nioReadyOps(), sk);
+}
+
+initialOps在更新传入的是原来的ReadyOps 但是新增的时候 传入的是0
+是因为更新的时候 需要将之前已经触发过的保留 而不是覆盖掉
+而新增第一次的时候本来就没有覆盖一说
+public boolean translateReadyOps(int ops, int initialOps,
+                                     SelectionKeyImpl sk) {
+        int intOps = sk.nioInterestOps(); // Do this just once, it synchronizes
+        int oldOps = sk.nioReadyOps();
+        int newOps = initialOps;
+
+        //见poll:https://baike.baidu.com/item/poll/3643578
+
+        if ((ops & Net.POLLNVAL) != 0) {
+            // This should only happen if this channel is pre-closed while a
+            // selection operation is in progress
+            // ## Throw an error if this channel has not been pre-closed
+            return false;
+        }
+
+        //如果是错误的话
+        if ((ops & (Net.POLLERR | Net.POLLHUP)) != 0) {
+            newOps = intOps;
+            sk.nioReadyOps(newOps);
+            return (newOps & ~oldOps) != 0;
+        }
+
+        //如果是监听socket的话 并且有连接的话 那么设置为监听连接
+        //成功
+        if (((ops & Net.POLLIN) != 0) &&
+            ((intOps & SelectionKey.OP_ACCEPT) != 0))
+                newOps |= SelectionKey.OP_ACCEPT;
+        sk.nioReadyOps(newOps);
+
+        //这一步很重要 为了判断是否又新增的事件 如果返回0的话 说明到
+        //没有新的事件发送 调用方不会做下一步的处理
+        return (newOps & ~oldOps) != 0;
+}
+
+设置监听事件
+public void translateAndSetInterestOps(int var1, SelectionKeyImpl var2) {
+        int var3 = 0;
+        if ((var1 & 16) != 0) {
+            var3 |= Net.POLLIN;
+        }
+        //加入事件
+        var2.selector.putEventOps(var2, var3);
+}

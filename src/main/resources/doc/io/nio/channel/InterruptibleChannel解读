@@ -1,0 +1,12 @@
+InterruptibleChannel 解读
+
+1.可被中断的channel,如果一个线程在该channel上被堵塞的时候,其他线程使用close关闭该channel的时候
+那么之前堵塞的线程将会收到AsynchronousCloseException异常.
+
+如果堵塞的时候其他线程调用线程的Thread#interrupt()方法,那么该channel会被关闭,并且堵塞的线程将会收到
+ClosedByInterruptException异常.如果一个线程在调用之前中断状态就被设置了的话,那么一旦调用该channel的
+堵塞方法的话,那么马上会收到ClosedByInterruptException异常,并且该channel会被关闭.
+
+如果想要一个channel能够支持异步的关闭以及可被中断,那么必须实现该方法.
+
+上面几点都涉及到了channel的关闭,所以该接口重定义close方法表示对channel的关闭产生的影响
