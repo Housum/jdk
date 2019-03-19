@@ -24,17 +24,21 @@ ScheduledThreadPoolExecutor解读
 来执行)
 
 如何实现一个任务定时执行？
-因为任务是放入到工作队列workQueue中的,所以每次执行之后都会被poll或者take移除,所以如果是定时的任务的话,那么在执行完成之后
-会被重新计算下一次执行的时间并且加入到工作队列
+因为任务是放入到工作队列workQueue中的,所以每次执行之后都会被poll或者take移除,所以是定时的任务的话,那么在执行完成之后
+会被重新计算下一次执行的时间并且重新加入到工作队列
 
 2.内部类
 
 (1).DelayedWorkQueue:
 相关:leader-follower(LF)多线程网络模型 http://ifeve.com/leader-follower-thread-model/
 
-该类实现了按照执行时间的优先级堵塞队列,详情见《BlockingQueue详解》数据结构为二叉堆, 没有太多需要关注的东西
-static class DelayedWorkQueue extends AbstractQueue<Runnable>
-    implements BlockingQueue<Runnable> {
+该类实现了按照执行时间的优先级堵塞队列,详情见《BlockingQueue详解》数据结构为二叉堆,主要的做的就是
+在take的时候 判断首元素是否可以运行了,如果能够运行的话那么弹出元素进行运行否则的话,进行睡眠。
+在offer的时候将元素加入到队列中
+static class DelayedWorkQueue extends AbstractQueue<Runnable> implements BlockingQueue<Runnable>
+
+
+
 
 (2).ScheduledFutureTask:
 继承了FutureTask
@@ -103,8 +107,8 @@ void reExecutePeriodic(RunnableScheduledFuture<?> task) {
 3.原理分析
 (1).整个的一个流程
 首先新建一个定时任务执行器的时候,就初始化了一个按照执行时间储存的优先级堵塞队列 -> 加入定时任务,将任务进行包装计算出
-执行的时间并且确保线程池中有工作线程执行->工作线程通过take一直堵塞在队列的获取上面,拿到优先级堵塞队列的首元素检查元素
-是否已经到了可以执行的时间了,如果没有的话,那么不返回-> 如果执行完任务之后,计算下一次执行的时间并且将任务重新放入到工作
+执行的时间并且确保线程池中有工作线程执行(ensurePrestart保证)->工作线程通过take一直堵塞在队列的获取上面,拿到优先级堵塞队列的首元素检查元素
+是否已经到了可以执行的时间了,如果没有的话,那么不返回,并且睡眠一段时间-> 如果执行完任务之后,计算下一次执行的时间并且将任务重新放入到工作
 队列中
 
 (2).方法分析
