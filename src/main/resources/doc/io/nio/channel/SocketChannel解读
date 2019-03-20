@@ -1,0 +1,96 @@
+SocketChannel解读
+
+1.是面向流的socket的channel对象,提供了接连远程socket的能力,提供读写的能力.提供了连接的
+异步能力,在使用connect之后,之后通过finishConnect进行完成连接,同时也可以通过isConnectionPending判断
+连接是否正在进行
+
+支持异步的关闭读写的能力,如果读的动作正在堵塞,那么当关闭的时候将会返回-1表示没有成功.如果是写模式的话,
+那么将会抛出AsynchronousCloseException
+
+支持的TCP/IP参数:
+java.net.StandardSocketOptions#SO_SNDBUF SO_SNDBUF
+发送缓存区的大小
+java.net.StandardSocketOptions#SO_RCVBUF SO_RCVBUF
+接受缓存区的大小
+java.net.StandardSocketOptions#SO_KEEPALIVE SO_KEEPALIVE
+周期性判断是否存活
+java.net.StandardSocketOptions#SO_REUSEADDR SO_REUSEADDR
+允许重用本地地址
+java.net.StandardSocketOptions#SO_LINGER SO_LINGER
+若有数据则延迟关闭
+java.net.StandardSocketOptions#TCP_NODELAY TCP_NODELAY
+禁止Nagle算法.Nagle算法：https://baike.baidu.com/item/Nagle%E7%AE%97%E6%B3%95/5645172
+
+2.继承的接口
+ScatteringByteChannel
+将收到的数据分摊到多个ByteBuffer
+
+GatheringByteChannel
+将多个ByteBuffer的数据合并到写到一个channel去
+
+3.方法分析
+
+打开一个SocketChannel,打开的时候并不是连接的,需要通过connect连接连接
+远程socket
+public static SocketChannel open() throws IOException {
+      return SelectorProvider.provider().openSocketChannel();
+}
+
+打开SocketChannel 并且进行连接远程socket
+public static SocketChannel open(SocketAddress remote)
+    throws IOException
+{
+    SocketChannel sc = open();
+    try {
+        sc.connect(remote);
+    } catch (Throwable x) {
+        try {
+            sc.close();
+        } catch (Throwable suppressed) {
+            x.addSuppressed(suppressed);
+        }
+        throw x;
+    }
+    assert sc.isConnected();
+    return sc;
+}
+
+有效的事件 读 写 连接
+public final int validOps() {
+    return (SelectionKey.OP_READ
+            | SelectionKey.OP_WRITE
+            | SelectionKey.OP_CONNECT);
+}
+
+关闭读操作 如果有其他的线程堵塞在读操作中 那么将会堵塞的线程将会被唤醒 返回-1
+public abstract SocketChannel shutdownInput() throws IOException
+
+关闭写操作 如果有其他的线程堵塞在写操作中 那么将会堵塞的线程将抛出异常
+public abstract SocketChannel shutdownOutput() throws IOException
+
+返回适配的Socket对象
+public abstract Socket socket()
+
+是否已经连接
+public abstract boolean isConnected()
+
+是否正在连接
+public abstract boolean isConnectionPending()
+
+进行连接操作,如果是非堵塞的操作的话,那么可能返回false,之后需要通过finishConnect
+进行最终连接的操作.如果是堵塞模式的话 那么会一直堵塞直到连接成功。
+public abstract boolean connect(SocketAddress remote) throws IOException
+
+对于非堵塞的时候,在调用connect并不一定连接成功,在之后需要通过finishConnect进行连接是否完成的
+操作,如果完成连接的话,那么将会返回true,如果还在连接的话,那么返回false. 如果连接失败的话 那么抛出异常
+public abstract boolean finishConnect() throws IOException
+
+读数据:
+public abstract int read(ByteBuffer dst) throws IOException
+public abstract long read(ByteBuffer[] dsts, int offset, int length) throws IOException
+
+写数据:
+public abstract int write(ByteBuffer src) throws IOException
+public abstract long write(ByteBuffer[] srcs, int offset, int length) throws IOException
+
+

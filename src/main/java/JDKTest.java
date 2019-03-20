@@ -267,8 +267,8 @@ public class JDKTest<K extends Object & Map, V> implements Serializable {
                 e.printStackTrace();
             }
         }).start();
-//        TimeUnit.SECONDS.sleep(2);
-//        testSocketServer();
+        TimeUnit.SECONDS.sleep(2);
+        testSocketServer();
     }
 
 
@@ -284,44 +284,48 @@ public class JDKTest<K extends Object & Map, V> implements Serializable {
         socketChannel.configureBlocking(false);
         socketChannel.register(selector, SelectionKey.OP_ACCEPT);
 
-//        while (true) {
-//            int i = selector.select();
-//            if (i != 0) {
-//                Iterator<SelectionKey> selectionKeyIterator = selector.selectedKeys().iterator();
-//                while (selectionKeyIterator.hasNext()) {
-//                    SelectionKey selectionKey = selectionKeyIterator.next();
-//
-//                    if (selectionKey.isAcceptable()) {
-//                        log("finished");
-//                        ServerSocketChannel serverSocketChannel = (ServerSocketChannel) selectionKey.channel();
-//                        SocketChannel channel = serverSocketChannel.accept();
-//                        channel.configureBlocking(false);
-//                        channel.register(selector, SelectionKey.OP_READ);
-//                    } else if (selectionKey.isReadable()) {
-////                        log("server");
-//                        SocketChannel channel = (SocketChannel) selectionKey.channel();
-//                        ByteBuffer byteBuffer = ByteBuffer.allocate(1024);
-//                        int count = channel.read(byteBuffer);
-//                        while (count > 0) {
-//                            byteBuffer.flip();
-//                            log(new String(byteBuffer.array(), 0, byteBuffer.remaining()));
-//                            byteBuffer.clear();
-//                            count = channel.read(byteBuffer);
-//                        }
-//                        channel.register(selector, SelectionKey.OP_WRITE);
-//                    } else if (selectionKey.isWritable()) {
-//                        ByteBuffer charBuffer = ByteBuffer.allocate(1024);
-//                        charBuffer.put("from server\n".getBytes());
-//                        SocketChannel channel = (SocketChannel) selectionKey.channel();
-//                        charBuffer.flip();
-//                        channel.write(charBuffer);
-//                        channel.close();
-//                    }
-//
-//                    selectionKeyIterator.remove();
-//                }
-//            }
-//        }
+        while (true) {
+            int i = selector.select();
+            if (i != 0) {
+                Iterator<SelectionKey> selectionKeyIterator = selector.selectedKeys().iterator();
+                while (selectionKeyIterator.hasNext()) {
+                    SelectionKey selectionKey = selectionKeyIterator.next();
+
+                    if (selectionKey.isAcceptable()) {
+                        log("accept");
+
+                        ServerSocketChannel serverSocketChannel = (ServerSocketChannel) selectionKey.channel();
+                        SocketChannel channel = serverSocketChannel.accept();
+                        channel.configureBlocking(false);
+
+                        channel.register(selector, SelectionKey.OP_READ);
+                    } else if (selectionKey.isReadable()) {
+                        SocketChannel channel = (SocketChannel) selectionKey.channel();
+                        ByteBuffer byteBuffer = ByteBuffer.allocate(1024);
+                        while (channel.read(byteBuffer) > 0) {
+                            byteBuffer.flip();
+                            String clientMsg = new String(byteBuffer.array(), 0, byteBuffer.remaining());
+                            Integer index = Integer.valueOf(clientMsg);
+                            log("客户端传入的数字:" + index);
+                            if (index % 5 == 0) {
+                                channel.register(selector, SelectionKey.OP_WRITE);
+                                selectionKey.attach("您传入数字为5的倍数" + index);
+                            }
+                            byteBuffer.clear();
+                        }
+                    } else if (selectionKey.isWritable()) {
+                        SocketChannel channel = (SocketChannel) selectionKey.channel();
+                        ByteBuffer charBuffer = ByteBuffer.allocate(1024);
+                        String content = (String) selectionKey.attachment();
+                        charBuffer.put(("this is server msg :" + content).getBytes());
+                        charBuffer.flip();
+                        channel.write(charBuffer);
+                        selectionKey.interestOps(SelectionKey.OP_READ);
+                    }
+                    selectionKeyIterator.remove();
+                }
+            }
+        }
     }
 
     public static void testSocketServer() throws Exception {
@@ -331,81 +335,43 @@ public class JDKTest<K extends Object & Map, V> implements Serializable {
         SocketChannel socketChannel = SocketChannel.open();
         socketChannel.configureBlocking(false);
         socketChannel.register(selector, SelectionKey.OP_CONNECT);
-        socketChannel.connect(new InetSocketAddress("127.0.0.1", 8082));
+        boolean cc = socketChannel.connect(new InetSocketAddress("127.0.0.1", 8082));
+        log("cc:" + cc);
+
+        int k = 0;
+
+        while (true) {
+            int i = selector.select();
+            if (i > 0) {
+                Set<SelectionKey> selectionKeySet = selector.selectedKeys();
+                Iterator<SelectionKey> iterator = selectionKeySet.iterator();
+                while (iterator.hasNext()) {
+                    SelectionKey sk = iterator.next();
+                    iterator.remove();
+                    if (sk.isConnectable()) {
+                        SocketChannel socketChannel1 = (SocketChannel) sk.channel();
+                        socketChannel1.finishConnect();
+                        socketChannel1.register(sk.selector(), SelectionKey.OP_WRITE | SelectionKey.OP_READ);
+                    } else if (sk.isReadable()) {
+                        ByteBuffer byteBuffer = ByteBuffer.allocate(1024);
+                        SocketChannel sc = (SocketChannel) sk.channel();
+                        if (sc.read(byteBuffer) > 0) {
+                            byteBuffer.flip();
+                            log("服务端消息:" + new String(byteBuffer.array(), 0, byteBuffer.remaining()));
+                        }
+                    } else if (sk.isWritable()) {
+                        TimeUnit.SECONDS.sleep(1);
+                        ByteBuffer charBuffer = ByteBuffer.allocate(1024);
+                        charBuffer.put(("" + k++).getBytes());
+                        charBuffer.flip();
+                        SocketChannel sc = (SocketChannel) sk.channel();
+                        sc.write(charBuffer);
+                    }
+                }
 
 
-        selector.select();
-
-        Set<SelectionKey> selectionKeySet = selector.selectedKeys();
-        Iterator<SelectionKey> iterator = selectionKeySet.iterator();
-        SelectionKey selectionKey = iterator.next();
-        iterator.remove();
-
-        if (selectionKey.isConnectable()) {
-            SocketChannel socketChannel1 = (SocketChannel) selectionKey.channel();
-            socketChannel1.finishConnect();
-//            socketChannel1.register(selector, SelectionKey.OP_READ);
-        }
-
-
-        Thread thread = new Thread(() -> {
-            try {
-                log("selector");
-                selector.select();
-            } catch (Exception e) {
-                e.printStackTrace();
             }
-        });
-        thread.start();
-
-        TimeUnit.SECONDS.sleep(1);
-
-        log("selectNow");
-        selector.selectNow();
-
-        thread.join();
-
-
-
-
-//        while (true) {
-//            int i = selector.select();
-//            if (i > 0) {
-//                Set<SelectionKey> selectionKeySet = selector.selectedKeys();
-//                Iterator<SelectionKey> iterator = selectionKeySet.iterator();
-//                while (iterator.hasNext()) {
-//
-//                    SelectionKey sk = iterator.next();
-//                    iterator.remove();
-//                    if (sk.isConnectable()) {
-//                        SocketChannel sc = (SocketChannel) sk.channel();
-//                        ByteBuffer charBuffer = ByteBuffer.allocate(1024);
-//                        charBuffer.put("from client".getBytes());
-//                        SocketChannel channel = (SocketChannel) sk.channel();
-//                        channel.finishConnect();
-//                        charBuffer.flip();
-//                        channel.write(charBuffer);
-//                        sc.register(sk.selector(), SelectionKey.OP_READ);
-//                    } else if (sk.isReadable()) {
-//                        ByteBuffer byteBuffer = ByteBuffer.allocate(1024);
-//                        SocketChannel sc = (SocketChannel) sk.channel();
-//                        int j = sc.read(byteBuffer);
-//                        if (j > 0) {
-//                            byteBuffer.flip();
-//                            log(new String(byteBuffer.array(), 0, byteBuffer.remaining()));
-//                            j = sc.read(byteBuffer);
-//                        }
-//                        ByteBuffer charBuffer = ByteBuffer.allocate(1024);
-//                        charBuffer.put("from client".getBytes());
-//                        charBuffer.flip();
-//                        sc.write(charBuffer);
-//                    } else if (sk.isWritable()) {
-//
-//                    }
-//                }
-//            }
-//        }
-
+        }
     }
 
     public static void testInputStreamMarkAndReset() {

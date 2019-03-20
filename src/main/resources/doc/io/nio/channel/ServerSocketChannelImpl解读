@@ -2,7 +2,7 @@ ServerSocketChannelImpl解读
 
 源码:
 https://github.com/frohoff/jdk8u-dev-jdk/blob/da0da73ab82ed714dc5be94acd2f0d00fbdfe2e9/src/share/classes/sun/nio/ch/ServerSocketChannelImpl.java
-accept 内核函数:
+socket编程涉及到内核函数:
 https://blog.csdn.net/dengjin20104042056/article/details/52357452
 http://www.cnblogs.com/jiangzhaowei/p/8261174.html
 TCP参数:
