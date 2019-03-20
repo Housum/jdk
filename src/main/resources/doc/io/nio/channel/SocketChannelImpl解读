@@ -1,0 +1,129 @@
+SocketChannelImpl解读
+
+源码:
+https://github.com/Cosmic-OS/platform_libcore/blob/31743e141c277387c4d28ae6cc777703945a35eb/ojluni/src/main/java/sun/nio/ch/SocketChannelImpl.java
+
+native:
+https://github.com/dmurimi14/ALPS-MP-N1.MP1-V1_FIH6737M_65_N1_INHOUSE/blob/cb8e0843db07005be54b67d3c10f5c4a06979c05/libcore/ojluni/src/main/native/SocketChannelImpl.c
+
+在finishConnect中的native中使用到的poll检测是否完成连接:
+https://blog.csdn.net/csshuke/article/details/78906194
+
+使用到的内部方法Net.c:
+https://github.com/Cosmic-OS/platform_libcore/blob/31743e141c277387c4d28ae6cc777703945a35eb/ojluni/src/main/native/Net.c
+
+socket编程中涉及到的内核函数:
+http://www.cnblogs.com/jiangzhaowei/p/8261174.html(内核函数讲解的比较仔细)
+https://blog.csdn.net/dengjin20104042056/article/details/52357452(TCP整个交互过程图解画的很好)
+
+内核函数设置TCP/IP 参数
+https://blog.csdn.net/jasonliuvip/article/details/22591531
+
+
+1.作为数据流交互的channel,和ServerSocketChannel不同在于该类存在了大量的流读写.也就是通过它进行客户端和服务端的交互
+
+2.属性
+private final FileDescriptor fd
+该channel的socket套接字的文件描述符
+
+private final int fdVal
+文件描述符的数值型表示方式
+
+private volatile long readerThread = 0
+private volatile long writerThread = 0
+表示的是当前的读写线程 是为了对他们进行唤醒(在中断的时候)，所以这里进行了保存
+
+private final Object readLock = new Object()
+读锁 在读数据的时候进行加锁
+
+private final Object writeLock = new Object()
+写锁 在写数据的时候进行加锁
+
+private final Object stateLock = new Object()
+在以下的字段进行修改的时候的对象锁
+
+private boolean isReuseAddress
+地址是否可以重用
+
+private static final int ST_UNINITIALIZED = -1;
+private static final int ST_UNCONNECTED = 0;
+private static final int ST_PENDING = 1;
+private static final int ST_CONNECTED = 2;
+private static final int ST_KILLPENDING = 3;
+private static final int ST_KILLED = 4;
+private int state = ST_UNINITIALIZED
+当前channel的状态 取值为上面这些常量 channel的状态都是由上面往下的(并不是说从-1开始到0到1这种
+因为有可能在ServerSocketChannel的accept的时候 是直接从-1到2)
+
+private InetSocketAddress localAddress
+远程连接地址
+
+private InetSocketAddress remoteAddress
+本地socket地址
+
+private boolean isInputOpen = true
+读是否打开 默认是打开的 当关闭的时候为false
+
+private boolean isOutputOpen = true
+写是否打开 默认是打开的 当关闭的时候为false
+
+private boolean readyToConnect = false
+是否可以连接了,这个值在OP_CONNECT被触发的时候 被设置为true
+如果为false的话 那么在finishConnect校验的时候将会使用内核函数poll进行事件的校验,如下:
+
+这里的ready就是传入了readyToConnect
+if (!ready) {
+    poller.fd = fd;
+    poller.events = POLLOUT;
+    poller.revents = 0;
+    result = poll(&poller, 1, block ? -1 : 0);
+    if (result < 0) {
+        JNU_ThrowIOExceptionWithLastError(env, "Poll failed");
+        return IOS_THROWN;
+    }
+    if (!block && (result == 0))
+        return IOS_UNAVAILABLE;
+}
+
+private Socket socket
+懒加载的,当需要返回SocketChannel适配的Socket的时候,进行初始化
+
+3.方法分析
+根据生命周期流程分析
+
+
+构造:
+第一种通过SelectorProvider的open方式
+SocketChannelImpl(SelectorProvider sp) throws IOException {
+    super(sp);
+    //这里通过内核函数的socket方法创建了一个socket套接字;同时包装
+    //成FileDescriptor
+    this.fd = Net.socket(true);
+    //获取文件描述符的数值表示形式
+    this.fdVal = IOUtil.fdVal(fd);
+    //状态初始化为ST_UNCONNECTED
+    this.state = ST_UNCONNECTED;
+}
+
+第一种通过ServerSocketChannel的accept监听到连接方式创建
+SocketChannelImpl(SelectorProvider sp,
+                  FileDescriptor fd, InetSocketAddress remote)
+    throws IOException
+{
+    super(sp);
+    this.fd = fd;
+    this.fdVal = IOUtil.fdVal(fd);
+    //初始化为连接
+    this.state = ST_CONNECTED;
+    //文件描述符的本地地址
+    this.localAddress = Net.localAddress(fd);
+    //连接的远程地址（这个时候为客户端的地址）
+    this.remoteAddress = remote;
+}
+
+
+
+
+
+
+
