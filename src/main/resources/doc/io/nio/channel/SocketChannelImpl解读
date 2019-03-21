@@ -91,9 +91,8 @@ private Socket socket
 3.方法分析
 根据生命周期流程分析
 
-
 构造:
-第一种通过SelectorProvider的open方式
+第一种方式通过SelectorProvider的open方式
 SocketChannelImpl(SelectorProvider sp) throws IOException {
     super(sp);
     //这里通过内核函数的socket方法创建了一个socket套接字;同时包装
@@ -104,8 +103,7 @@ SocketChannelImpl(SelectorProvider sp) throws IOException {
     //状态初始化为ST_UNCONNECTED
     this.state = ST_UNCONNECTED;
 }
-
-第一种通过ServerSocketChannel的accept监听到连接方式创建
+第二种方式通过ServerSocketChannel的accept监听到连接方式创建
 SocketChannelImpl(SelectorProvider sp,
                   FileDescriptor fd, InetSocketAddress remote)
     throws IOException
@@ -121,9 +119,522 @@ SocketChannelImpl(SelectorProvider sp,
     this.remoteAddress = remote;
 }
 
+连接:
+public boolean connect(SocketAddress sa) throws IOException {
+        int localPort = 0;
+
+        //这里加了读的锁 在连接的过程中 读写的操作将会一直堵塞
+        synchronized (readLock) {
+            synchronized (writeLock) {
+                //这一步是判断是否打开并且没有进行连接
+                ensureOpenAndUnconnected();
+                InetSocketAddress isa = Net.checkAddress(sa);
+                SecurityManager sm = System.getSecurityManager();
+                if (sm != null)
+                    sm.checkConnect(isa.getAddress().getHostAddress(),
+                                    isa.getPort());
+                //参见doc/io/nio/channel/AbstractSelectableChannel解读 blockingLock()
+                synchronized (blockingLock()) {
+                    int n = 0;
+                    try {
+                        try {
+                        //堵塞机制的开始
+                            begin();
+                            synchronized (stateLock) {
+                                if (!isOpen()) {
+                                    return false;
+                                }
+                                // notify hook only if unbound
+                                if (localAddress == null) {
+                                    NetHooks.beforeTcpConnect(fd,
+                                                           isa.getAddress(),
+                                                           isa.getPort());
+                                }
+                                //获取当前的线程 连接为读操作
+                                readerThread = NativeThread.current();
+                            }
+                            for (;;) {
+                                InetAddress ia = isa.getAddress();
+                                if (ia.isAnyLocalAddress())
+                                    ia = InetAddress.getLocalHost();
+
+                                //调用内核函数 connect 这里进行三次握手的操作
+                                n = Net.connect(fd,
+                                                ia,
+                                                isa.getPort());
+                                //这里判断是否被操作系统中断(抢占式情况下 可能被操作系统中断)
+                                //所以这里加上了isOpen(). 如果是关闭操作的中断(关闭操作通过唤醒指定线程)
+                                //那么就直接结束操作 并且在end中就进行判断n抛出异常
+                                if (  (n == IOStatus.INTERRUPTED)
+                                      && isOpen())
+                                    continue;
+                                break;
+                            }
+
+                        } finally {
+                            //将读线程进行清理
+                            readerCleanup();
+                            //中断机制结束
+                            end((n > 0) || (n == IOStatus.UNAVAILABLE));
+                            assert IOStatus.check(n);
+                        }
+                    } catch (IOException x) {
+                        // If an exception was thrown, close the channel after
+                        // invoking end() so as to avoid bogus
+                        // AsynchronousCloseExceptions
+                        close();
+                        throw x;
+                    }
+                    //修改状态
+                    synchronized (stateLock) {
+                        remoteAddress = isa;
+
+                        //如果大于0 表示连接成功 直接到连接成功
+                        if (n > 0) {
+                            // Connection succeeded; disallow further
+                            // invocation
+                            //状态流转到ST_CONNECTED
+                            state = ST_CONNECTED;
+                            if (isOpen())
+                            //设置本地地址
+                                localAddress = Net.localAddress(fd);
+                            return true;
+                        }
+                        // If nonblocking and no exception then connection
+                        // pending; disallow another invocation
+                        //如果connect返回的是0 那么需要后面通过finishConnect的poll()去校验
+                        //是否可写
+                        if (!isBlocking()) {
+                            state = ST_PENDING;
+                            if (isOpen()) {
+                                localAddress = Net.localAddress(fd);
+                            }
+                        }
+                    }
+                }
+                return false;
+            }
+        }
+}
+完成连接
+public boolean finishConnect() throws IOException {
+        synchronized (readLock) {
+            synchronized (writeLock) {
+                synchronized (stateLock) {
+                    if (!isOpen())
+                        throw new ClosedChannelException();
+                    //在Connect中已经完成了连接 那么不需要使用poll进行校验
+                    if (state == ST_CONNECTED)
+                        return true;
+                    //否则需要进行校验
+                    if (state != ST_PENDING)
+                        throw new NoConnectionPendingException();
+                }
+                int n = 0;
+                try {
+                    try {
+                        //堵塞机制处理开始
+                        begin();
+                        synchronized (blockingLock()) {
+                            synchronized (stateLock) {
+                                if (!isOpen()) {
+                                    return false;
+                                }
+                                //记录读线程
+                                readerThread = NativeThread.current();
+                            }
+
+                            BlockGuard.getThreadPolicy().onNetwork();
+                            if (!isBlocking()) {
+                                for (;;) {
+                                    //底层使用内核函数poll 进行事件的校验 检查是
+                                    //否能写
+                                    n = checkConnect(fd, false,
+                                                     readyToConnect);
+
+                                    //connect相似
+                                    if (  (n == IOStatus.INTERRUPTED)
+                                          && isOpen())
+                                        continue;
+                                    break;
+                                }
+                            } else {
+                                for (;;) {
+                                    //如果是堵塞模式的话
+                                    n = checkConnect(fd, true,
+                                                     readyToConnect);
+                                    if (n == 0) {
+                                        // Loop in case of
+                                        // spurious notifications
+                                        continue;
+                                    }
+                                    if (  (n == IOStatus.INTERRUPTED)
+                                          && isOpen())
+                                        continue;
+                                    break;
+                                }
+                            }
+                        }
+                    } finally {
+                        synchronized (stateLock) {
+                            readerThread = 0;
+                            //如果是要被关闭
+                            if (state == ST_KILLPENDING) {
+                                kill();
+                                // poll()/getsockopt() does not report
+                                // error (throws exception, with n = 0)
+                                // on Linux platform after dup2 and
+                                // signal-wakeup. Force n to 0 so the
+                                // end() can throw appropriate exception
+                                n = 0;
+                            }
+                        }
+
+                        //堵塞机制结束
+                        end((n > 0) || (n == IOStatus.UNAVAILABLE));
+                        assert IOStatus.check(n);
+                    }
+                } catch (IOException x) {
+                    // If an exception was thrown, close the channel after
+                    // invoking end() so as to avoid bogus
+                    // AsynchronousCloseExceptions
+                    close();
+                    throw x;
+                }
+                //大于0 表示事件检测已经有事件被触发了 进行状态的修改
+                if (n > 0) {
+                    synchronized (stateLock) {
+                        state = ST_CONNECTED;
+                        if (isOpen())
+                            localAddress = Net.localAddress(fd);
+                    }
+                    return true;
+                }
+                return false;
+            }
+        }
+}
+
+读数据:
+public int read(ByteBuffer buf) throws IOException {
+
+        if (buf == null)
+            throw new NullPointerException();
+
+        synchronized (readLock) {
+            if (!ensureReadOpen())
+                return -1;
+            Object traceContext = null;
+            if (isBlocking()) {
+                traceContext = IoTrace.socketReadBegin();
+            }
+            int n = 0;
+            try {
+
+                // Set up the interruption machinery; see
+                // AbstractInterruptibleChannel for details
+                //
+
+                堵塞机制开始
+                begin();
+
+                //判断是否打开
+                synchronized (stateLock) {
+                    if (!isOpen()) {
+                    // Either the current thread is already interrupted, so
+                    // begin() closed the channel, or another thread closed the
+                    // channel since we checked it a few bytecodes ago.  In
+                    // either case the value returned here is irrelevant since
+                    // the invocation of end() in the finally block will throw
+                    // an appropriate exception.
+                    //
+                        return 0;
+
+                    }
+
+                    // Save this thread so that it can be signalled on those
+                    // platforms that require it
+                    //
+                    //保存读线程状态
+                    readerThread = NativeThread.current();
+                }
+
+                // Between the previous test of isOpen() and the return of the
+                // IOUtil.read invocation below, this channel might be closed
+                // or this thread might be interrupted.  We rely upon the
+                // implicit synchronization point in the kernel read() call to
+                // make sure that the right thing happens.  In either case the
+                // implCloseSelectableChannel method is ultimately invoked in
+                // some other thread, so there are three possibilities:
+                //
+                //   - implCloseSelectableChannel() invokes nd.preClose()
+                //     before this thread invokes read(), in which case the
+                //     read returns immediately with either EOF or an error,
+                //     the latter of which will cause an IOException to be
+                //     thrown.
+                //
+                //   - implCloseSelectableChannel() invokes nd.preClose() after
+                //     this thread is blocked in read().  On some operating
+                //     systems (e.g., Solaris and Windows) this causes the read
+                //     to return immediately with either EOF or an error
+                //     indication.
+                //
+                //   - implCloseSelectableChannel() invokes nd.preClose() after
+                //     this thread is blocked in read() but the operating
+                //     system (e.g., Linux) doesn't support preemptive close,
+                //     so implCloseSelectableChannel() proceeds to signal this
+                //     thread, thereby causing the read to return immediately
+                //     with IOStatus.INTERRUPTED.
+                //
+                // In all three cases the invocation of end() in the finally
+                // clause will notice that the channel has been closed and
+                // throw an appropriate exception (AsynchronousCloseException
+                // or ClosedByInterruptException) if necessary.
+                //
+                // *There is A fourth possibility. implCloseSelectableChannel()
+                // invokes nd.preClose(), signals reader/writer thred and quickly
+                // moves on to nd.close() in kill(), which does a real close.
+                // Then a third thread accepts a new connection, opens file or
+                // whatever that causes the released "fd" to be recycled. All
+                // above happens just between our last isOpen() check and the
+                // next kernel read reached, with the recycled "fd". The solution
+                // is to postpone the real kill() if there is a reader or/and
+                // writer thread(s) over there "waiting", leave the cleanup/kill
+                // to the reader or writer thread. (the preClose() still happens
+                // so the connection gets cut off as usual).
+                //
+                // For socket channels there is the additional wrinkle that
+                // asynchronous shutdown works much like asynchronous close,
+                // except that the channel is shutdown rather than completely
+                // closed.  This is analogous to the first two cases above,
+                // except that the shutdown operation plays the role of
+                // nd.preClose().
 
 
 
+                //在isOpen检查之后和read方法返回之前会发生很多情况:
+                //1.在调用read方法之前,调用了implCloseSelectableChannel中的nd.preClose()
+                //那么在read方法会马上返回(返回EOF 或者错误)
+                //2.在堵塞在read方法上面的时候,调用了implCloseSelectableChannel中的nd.preClose()
+                //那么部分操作系统将会马上返回(返回EOF 或者错误)
+                //3.在堵塞在read方法上面的时候,调用了implCloseSelectableChannel中的nd.preClose()
+                //部分操作系统不会马上返回,那么在implCloseSelectableChannel中会对这部分线程进行唤醒,
+                //read会返回IOStatus.INTERRUPTED.
+                //上年这三种情况都能通过堵塞地址 end()中进行处理
 
+                //4.还有一种情况就是当整个channel被关闭了,当时这个时候有一个新的channel被创建出来,刚好文件socket套接字的
+                //文件描述符被再次分配了,那么可能读的就是其他的数据了0-0。那这种情况的处理办法就是延迟关闭,等待读写线程为空的情况
+                //下才能够关闭. 具体可以看implCloseSelectableChannel 以及kill的逻辑
+
+
+                for (;;) {
+
+                    //调用内核函数read读取流
+                    n = IOUtil.read(fd, buf, -1, nd);
+                    //防止是操作系统中断
+                    if ((n == IOStatus.INTERRUPTED) && isOpen()) {
+                        // The system call was interrupted but the channel
+                        // is still open, so retry
+                        continue;
+                    }
+                    return IOStatus.normalize(n);
+                }
+
+            } finally {
+                readerCleanup();        // Clear reader thread
+
+                if (isBlocking()) {
+                    IoTrace.socketReadEnd(traceContext, remoteAddress.getAddress(),
+                                          remoteAddress.getPort(), 0, n > 0 ? n : 0);
+                }
+
+                // The end method, which is defined in our superclass
+                // AbstractInterruptibleChannel, resets the interruption
+                // machinery.  If its argument is true then it returns
+                // normally; otherwise it checks the interrupt and open state
+                // of this channel and throws an appropriate exception if
+                // necessary.
+                //
+                // So, if we actually managed to do any I/O in the above try
+                // block then we pass true to the end method.  We also pass
+                // true if the channel was in non-blocking mode when the I/O
+                // operation was initiated but no data could be transferred;
+                // this prevents spurious exceptions from being thrown in the
+                // rare event that a channel is closed or a thread is
+                // interrupted at the exact moment that a non-blocking I/O
+                // request is made.
+                //
+
+                //中断机制处理 其中会判断是否是中断了并且抛出正确的异常
+                end(n > 0 || (n == IOStatus.UNAVAILABLE));
+
+                // Extra case for socket channels: Asynchronous shutdown
+                //
+
+                //有可能已经没有数据
+                synchronized (stateLock) {
+                    if ((n <= 0) && (!isInputOpen))
+                        return IOStatus.EOF;
+                }
+
+                assert IOStatus.check(n);
+
+            }
+        }
+}
+
+写数据:
+和read读数据也是相同的 基本都是一致的
+public int write(ByteBuffer buf) throws IOException {
+        if (buf == null)
+            throw new NullPointerException();
+        synchronized (writeLock) {
+            ensureWriteOpen();
+            int n = 0;
+            Object traceContext =
+                IoTrace.socketWriteBegin();
+
+            try {
+                begin();
+                synchronized (stateLock) {
+                    if (!isOpen())
+                        return 0;
+                   //保存写线程
+                    writerThread = NativeThread.current();
+                }
+                for (;;) {
+                    //调用内核函数写数据
+                    n = IOUtil.write(fd, buf, -1, nd);
+                    if ((n == IOStatus.INTERRUPTED) && isOpen())
+                        continue;
+                    return IOStatus.normalize(n);
+                }
+            } finally {
+                writerCleanup();
+                IoTrace.socketWriteEnd(traceContext, remoteAddress.getAddress(),
+                                       remoteAddress.getPort(), n > 0 ? n : 0);
+                end(n > 0 || (n == IOStatus.UNAVAILABLE));
+                synchronized (stateLock) {
+                    if ((n <= 0) && (!isOutputOpen))
+                        throw new AsynchronousCloseException();
+                }
+                assert IOStatus.check(n);
+            }
+        }
+}
+
+关闭读操作:
+public SocketChannel shutdownInput() throws IOException {
+    synchronized (stateLock) {
+        if (!isOpen())
+            throw new ClosedChannelException();
+        if (!isConnected())
+            throw new NotYetConnectedException();
+        if (isInputOpen) {
+            //见socket套接字的文件描述符的读能力关闭
+            Net.shutdown(fd, Net.SHUT_RD);
+            if (readerThread != 0)
+                //如果当前有读线程堵塞 那么将其唤醒
+                NativeThread.signal(readerThread);
+            isInputOpen = false;
+        }
+        return this;
+    }
+}
+
+关闭写操作:
+见关闭读操作
+public SocketChannel shutdownOutput() throws IOException {
+    synchronized (stateLock) {
+        if (!isOpen())
+            throw new ClosedChannelException();
+        if (!isConnected())
+            throw new NotYetConnectedException();
+        if (isOutputOpen) {
+            Net.shutdown(fd, Net.SHUT_WR);
+            if (writerThread != 0)
+                NativeThread.signal(writerThread);
+            isOutputOpen = false;
+        }
+        return this;
+    }
+}
+
+关闭Channel
+protected void implCloseSelectableChannel() throws IOException {
+        synchronized (stateLock) {
+            //首先将输入和输出关闭 这里为啥不需要Net.shutdown(fd, Net.SHUT_WR)
+            //以及Net.shutdown(fd, Net.SHUT_RD)呢 因为直接后面将会将这个文件描述符关闭
+            isInputOpen = false;
+            isOutputOpen = false;
+
+            // Close the underlying file descriptor and dup it to a known fd
+            // that's already closed.  This prevents other operations on this
+            // channel from using the old fd, which might be recycled in the
+            // meantime and allocated to an entirely different channel.
+            //
+            //进行预关闭 是为了
+            if (state != ST_KILLED)
+                nd.preClose(fd);
+
+            // Signal native threads, if needed.  If a target thread is not
+            // currently blocked in an I/O operation then no harm is done since
+            // the signal handler doesn't actually do anything.
+            //
+            //唤醒读线程
+            if (readerThread != 0)
+                NativeThread.signal(readerThread);
+
+            //唤醒写线程
+            if (writerThread != 0)
+                NativeThread.signal(writerThread);
+
+            // If this channel is not registered then it's safe to close the fd
+            // immediately since we know at this point that no thread is
+            // blocked in an I/O operation upon the channel and, since the
+            // channel is marked closed, no thread will start another such
+            // operation.  If this channel is registered then we don't close
+            // the fd since it might be in use by a selector.  In that case
+            // closing this channel caused its keys to be cancelled, so the
+            // last selector to deregister a key for this channel will invoke
+            // kill() to close the fd.
+            //
+            if (!isRegistered())
+                kill();
+        }
+}
+ public void kill() throws IOException {
+        synchronized (stateLock) {
+            if (state == ST_KILLED)
+                return;
+            if (state == ST_UNINITIALIZED) {
+                state = ST_KILLED;
+                return;
+            }
+            assert !isOpen() && !isRegistered();
+
+            // Postpone the kill if there is a waiting reader
+            // or writer thread. See the comments in read() for
+            // more detailed explanation.
+            //在read中提到的最后一种情况 延迟关闭 方式读错重用文件描述符的情况
+            if (readerThread == 0 && writerThread == 0) {
+                nd.close(fd);
+                state = ST_KILLED;
+            } else {
+                state = ST_KILLPENDING;
+            }
+        }
+}
+
+
+
+创建对应适配的Socket,懒加载的方式
+public Socket socket() {
+    synchronized (stateLock) {
+        if (socket == null)
+            socket = SocketAdaptor.create(this);
+        return socket;
+    }
+}
 
 

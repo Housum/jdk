@@ -198,7 +198,7 @@ public SocketChannel accept() throws IOException {
                     do {
                         //调用内核函数 accept
                         var3 = this.accept(this.fd, var4, var5);
-                        //-3表示的是没有连接
+                        //-3表示被中断 中断之后继续监听 sun.nio.ch.IOStatus
                     } while(var3 == -3 && this.isOpen());
                 } finally {
                     this.thread = 0L;
