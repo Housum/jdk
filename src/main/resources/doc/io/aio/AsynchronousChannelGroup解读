@@ -1,0 +1,45 @@
+AsynchronousChannelGroup解读
+
+1.AsynchronousChannelGroup是一系列的channel的集合,为了共享资源.对于IO操作以及completion handler
+的执行都是在AsynchronousChannelGroup其中的线程池中执行的
+
+AsynchronousChannelGroup可以通过其静态方式创建withFixedThreadPool创建固定线程池大小的group,或者withCachedThreadPool
+创建一个可以一直扩大的group
+
+该参数是在构建channel的时候被传入的，见:doc/io/aio/AsynchronousServerSocketChannel解读:40
+
+除了用户创建的之外,JVM自己还会创建一个,为了是给那些没有传入group的channel使用的
+
+2.方法
+创建不同类型的group
+public static AsynchronousChannelGroup withFixedThreadPool(int nThreads,
+                                                           ThreadFactory threadFactory)
+    throws IOException
+{
+    return AsynchronousChannelProvider.provider()
+        .openAsynchronousChannelGroup(nThreads, threadFactory);
+}
+public static AsynchronousChannelGroup withCachedThreadPool(ExecutorService executor,
+                                                            int initialSize)
+    throws IOException
+{
+    return AsynchronousChannelProvider.provider()
+        .openAsynchronousChannelGroup(executor, initialSize);
+}
+public static AsynchronousChannelGroup withThreadPool(ExecutorService executor)
+    throws IOException
+{
+    return AsynchronousChannelProvider.provider()
+        .openAsynchronousChannelGroup(executor, 0);
+}
+
+
+3.抽象方法
+以下的方法都可以参考ThreadPoolExecutor
+public abstract boolean isShutdown()
+public abstract boolean isTerminated()
+public abstract void shutdown()
+public abstract void shutdownNow() throws IOException
+public abstract boolean awaitTermination(long timeout, TimeUnit unit)
+    throws InterruptedException
+

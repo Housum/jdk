@@ -10,17 +10,12 @@ import java.lang.reflect.*;
 import java.net.InetSocketAddress;
 import java.net.URL;
 import java.nio.ByteBuffer;
-import java.nio.CharBuffer;
 import java.nio.channels.*;
 import java.security.AccessController;
 import java.security.ProtectionDomain;
-import java.text.Collator;
 import java.text.SimpleDateFormat;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ScheduledThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Condition;
@@ -262,17 +257,106 @@ public class JDKTest<K extends Object & Map, V> implements Serializable {
 
         new Thread(() -> {
             try {
-                testServiceSocketChannel();
+                testAsynchronousServerSocketChannel();
             } catch (Exception e) {
                 e.printStackTrace();
             }
         }).start();
         TimeUnit.SECONDS.sleep(2);
-        testSocketServer();
+        testAsynchronousSocketChannel();
+
+
+        TimeUnit.SECONDS.sleep(1000);
     }
 
 
     private static int RESIZE_STAMP_BITS = 16;
+
+
+    public static void testAsynchronousServerSocketChannel() throws Exception {
+
+        AsynchronousServerSocketChannel serverSocketChannel = AsynchronousServerSocketChannel.
+                open(AsynchronousChannelGroup.withThreadPool(Executors.newFixedThreadPool(4)));
+        serverSocketChannel.bind(new InetSocketAddress(8082));
+
+        serverSocketChannel.accept(null, new CompletionHandler<AsynchronousSocketChannel, Object>() {
+            @Override
+            public void completed(AsynchronousSocketChannel socketChannel, Object attachment) {
+                log("accept completed");
+
+                ByteBuffer byteBuffer =ByteBuffer.allocate(1024);
+                socketChannel.read(byteBuffer, byteBuffer, new CompletionHandler<Integer, ByteBuffer>() {
+                    @Override
+                    public void completed(Integer result, ByteBuffer buffer) {
+                        log("read completed");
+                        buffer.flip();
+                        log("这是服务端读到的信息:" + new String(buffer.array(),0,buffer.remaining()));
+                        buffer.clear();
+                        buffer.put("这是服务端的信息".getBytes());
+                        buffer.flip();
+                        socketChannel.write(buffer);
+                    }
+
+                    @Override
+                    public void failed(Throwable exc, ByteBuffer attachment) {
+
+                    }
+                });
+
+
+
+            }
+            @Override
+            public void failed(Throwable exc, Object attachment) {
+
+            }
+        });
+    }
+
+    public static void testAsynchronousSocketChannel() throws Exception {
+
+        AsynchronousSocketChannel socketChannel = AsynchronousSocketChannel.open();
+        socketChannel.connect(new InetSocketAddress(8082), null, new CompletionHandler<Void, Object>() {
+            @Override
+            public void completed(Void result, Object attachment) {
+                log("connect completed");
+                ByteBuffer byteBuffer = ByteBuffer.allocate(1024);
+                byteBuffer.put("这是客户端的消息".getBytes());
+                byteBuffer.flip();
+                socketChannel.write(byteBuffer);
+
+                byteBuffer.clear();
+
+                socketChannel.read(byteBuffer, byteBuffer, new CompletionHandler<Integer, ByteBuffer>() {
+
+                    @Override
+                    public void completed(Integer result, ByteBuffer buffer) {
+                        log("read completed");
+                        buffer.flip();
+                        log("这是客户端读到的信息:" + new String(buffer.array(),0,buffer.remaining()));
+                        buffer.clear();
+
+                        byteBuffer.put("这是客户端的消息1".getBytes());
+                        byteBuffer.flip();
+                        socketChannel.write(byteBuffer);
+
+                    }
+
+                    @Override
+                    public void failed(Throwable exc, ByteBuffer attachment) {
+
+                    }
+                });
+            }
+            @Override
+            public void failed(Throwable exc, Object attachment) {
+
+            }
+        });
+
+
+
+    }
 
 
     public static void testServiceSocketChannel() throws Exception {

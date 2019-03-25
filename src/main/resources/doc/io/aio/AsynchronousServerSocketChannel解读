@@ -1,0 +1,66 @@
+AsynchronousServerSocketChannel解读
+
+1.服务端的Channel,面向的是流的监听套接字,与ServerSocketChannel类似,只是这是异步的.创建之后通过bind
+方法绑定端口.
+其中当bind之后,通过accept方法获取连接,值得注意的是:在accept之前需要保证前面一个accept操作已经完成了,否则话
+将会抛出AcceptPendingException异常.
+
+支持的TCP/IP参数与ServerSocketChannel是相同的
+
+使用的例子:
+final AsynchronousServerSocketChannel listener =
+   AsynchronousServerSocketChannel.open().bind(new InetSocketAddress(5000));
+listener.accept(null, new CompletionHandler&lt;AsynchronousSocketChannel,Void&gt;() {
+   public void completed(AsynchronousSocketChannel ch, Void att) {
+       // accept the next connection
+       前面说到的 在前一个完成的情况下 然后在连接下一个
+       listener.accept(null, this);
+       // handle this connection
+       //处理下一个连接
+       handle(ch);
+   }
+   public void failed(Throwable exc, Void att) {
+       ...
+   }
+});
+
+实现的接口:
+AsynchronousChannel NetworkChannel
+
+2.方法
+返回AsynchronousChannelProvider,SPI的一个抽象类,不同的平台
+返回不同的实现,关于平台相关的都是由该类返回对象
+public final AsynchronousChannelProvider provider() {
+        return provider;
+}
+
+创建一个实例
+其中AsynchronousChannelGroup的作用有两个 第一个是内部实现了线程池 对于所有的异步操作都放入其线程池中做
+第二个功能就是在其中实现了事件复用的功能(kqueue,epoll)
+public static AsynchronousServerSocketChannel open(AsynchronousChannelGroup group)
+    throws IOException
+{
+    AsynchronousChannelProvider provider = (group == null) ?
+        AsynchronousChannelProvider.provider() : group.provider();
+    //因为具体的实例都是和平台相关的,不同平台实现的方式不同 所以通过了SPI的方式实现
+    return provider.openAsynchronousServerSocketChannel(group);
+}
+
+绑定端口
+public final AsynchronousServerSocketChannel bind(SocketAddress local)
+    throws IOException
+{
+    return bind(local, 0);
+}
+
+
+3.抽象方法
+设置TCP/IP参数
+public abstract <T> AsynchronousServerSocketChannel setOption(SocketOption<T> name, T value) throws IOException
+
+获取连接 attachment表示的是附带的内容,将会传入到CompletionHandler中
+CompletionHandler就是回调接口 其中有执行成功和执行失败两个方法
+public abstract <A> void accept(A attachment,CompletionHandler<AsynchronousSocketChannel,? super A> handler)
+
+获取连接 这种方式是返回了Future,之后可以通过get获取结果
+public abstract Future<AsynchronousSocketChannel> accept();

@@ -1,0 +1,23 @@
+MacOS BSD实现方式.
+
+采用的是KQueue的方式实现,底层还是使用的事件复用的方式
+
+JDK KQueue.c:
+https://github.com/huangyazhe/openJdk/blob/64729a0d02b190ec2af4b18a4a2730dcad5c6191/jdk/src/solaris/native/sun/nio/ch/KQueue.c
+
+API:
+https://blog.csdn.net/Timeinsist/article/details/80978713
+https://www.cnblogs.com/FG123/p/5256553.html
+https://blog.csdn.net/Namcodream521/article/details/83032615
+
+Port.java
+https://github.com/huangyazhe/openJdk/blob/64729a0d02b190ec2af4b18a4a2730dcad5c6191/jdk/src/solaris/classes/sun/nio/ch/Port.java
+KQueuePort.java
+https://github.com/huangyazhe/openJdk/blob/64729a0d02b190ec2af4b18a4a2730dcad5c6191/jdk/src/solaris/classes/sun/nio/ch/KQueuePort.java
+
+Invoker.java
+https://github.com/md-5/OpenJDK/blob/898644be29e5d2c5aaa22860e2d861e73fc4ef63/src/java.base/share/classes/sun/nio/ch/Invoker.java
+
+PendingFuture
+https://github.com/md-5/OpenJDK/blob/898644be29e5d2c5aaa22860e2d861e73fc4ef63/src/java.base/share/classes/sun/nio/ch/PendingFuture.java
+

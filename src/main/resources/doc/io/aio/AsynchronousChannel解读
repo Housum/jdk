@@ -1,0 +1,34 @@
+AsynchronousChannel解读
+
+该接口继承了Channel接口
+
+1.提供了异步的能力的Channel,不像NIO有selector,AIO实现的主要方式是通过事件复用+线程池的方式实现的,主要就是
+发现事件被触发之后通过异步的方式执行结果
+
+异步执行事件主要有两种方式,第一种是 返回Future<T> (见doc/concurrent/Future解读)
+第二种方式就是使用CompletionHandler,提供一个回调方法.当任务完成的时候,线程池负责调用其回调方法
+
+取消:
+当Future#cancel取消的时候,那么其他在Future等待的线程将会收到CancellationException异常.然后channel就处于
+错误的状态下,之后调用read和write操作的话 将会抛出运行时异常.
+Future的mayInterruptIfRunning的时候,那么当关闭channel的时候,将会被中断,所以这种情况下的话,所以堵塞在Future的
+线程将会收到CancellationException异常,其他的IO操作将会收到AsynchronousCloseException异常
+
+
+2.两种任务的任务
+采用Future的方式
+例如:
+public abstract Future<Void> connect(SocketAddress remote);
+返回的Future<T>中的T为结果,根据不同的方法返回的会有不同类型
+在调用完成之后就会马上的返回一个Future,之后可以通过对其的操作判断是否执行完成
+
+采用CompletionHandler的方式
+例如:
+public abstract <A> void connect(SocketAddress remote,A attachment,CompletionHandler<Void,? super A> handler)
+调用方法的时候,传入回调CompletionHandler,传入的attachment为透传的参数.在调用完成之后执行回调方法,并且将透传参数传入
+CompletionHandler中.范型的第一个参数结果,在连接的时候不存在所以设置为Void
+
+3.方法
+close
+在该channel上的其他未完成异步操作的线程都将抛出AsynchronousCloseException一次.
+当操作该channel的时候将会抛出ClosedChannelException
