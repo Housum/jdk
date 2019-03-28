@@ -16,7 +16,7 @@ listener.accept(null, new CompletionHandler&lt;AsynchronousSocketChannel,Void&gt
        前面说到的 在前一个完成的情况下 然后在连接下一个
        listener.accept(null, this);
        // handle this connection
-       //处理下一个连接
+       //处理当前连接
        handle(ch);
    }
    public void failed(Throwable exc, Void att) {
@@ -27,6 +27,7 @@ listener.accept(null, new CompletionHandler&lt;AsynchronousSocketChannel,Void&gt
 实现的接口:
 AsynchronousChannel NetworkChannel
 
+
 2.方法
 返回AsynchronousChannelProvider,SPI的一个抽象类,不同的平台
 返回不同的实现,关于平台相关的都是由该类返回对象
@@ -36,7 +37,7 @@ public final AsynchronousChannelProvider provider() {
 
 创建一个实例
 其中AsynchronousChannelGroup的作用有两个 第一个是内部实现了线程池 对于所有的异步操作都放入其线程池中做
-第二个功能就是在其中实现了事件复用的功能(kqueue,epoll)
+第二个功能就是在其中实现了事件复用的功能(kqueue,epoll)以及将channel感兴趣的时间注册到内核的事件复用中
 public static AsynchronousServerSocketChannel open(AsynchronousChannelGroup group)
     throws IOException
 {
@@ -58,9 +59,15 @@ public final AsynchronousServerSocketChannel bind(SocketAddress local)
 设置TCP/IP参数
 public abstract <T> AsynchronousServerSocketChannel setOption(SocketOption<T> name, T value) throws IOException
 
-获取连接 attachment表示的是附带的内容,将会传入到CompletionHandler中
-CompletionHandler就是回调接口 其中有执行成功和执行失败两个方法
+获取连接 attachment表示的是我们调用时候附带的内容,将会传入到CompletionHandler中,这里和ServerSocketChannel以及
+SocketChannel中register带上att是类似的.CompletionHandler就是回调接口 其中有执行成功和执行失败两个方法
 public abstract <A> void accept(A attachment,CompletionHandler<AsynchronousSocketChannel,? super A> handler)
 
 获取连接 这种方式是返回了Future,之后可以通过get获取结果
 public abstract Future<AsynchronousSocketChannel> accept();
+
+
+
+
+
+

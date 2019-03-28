@@ -21,3 +21,9 @@ https://github.com/md-5/OpenJDK/blob/898644be29e5d2c5aaa22860e2d861e73fc4ef63/sr
 PendingFuture
 https://github.com/md-5/OpenJDK/blob/898644be29e5d2c5aaa22860e2d861e73fc4ef63/src/java.base/share/classes/sun/nio/ch/PendingFuture.java
 
+UnixAsynchronousServerSocketChannelImpl:
+https://github.com/huangyazhe/openJdk/blob/64729a0d02b190ec2af4b18a4a2730dcad5c6191/jdk/src/solaris/classes/sun/nio/ch/UnixAsynchronousServerSocketChannelImpl.java
+
+2.整体流程
+Channel调用Group注册事件,Group通过轮询事件是否完成,如果完成的话 那么进行事件的执行（在线程池中执行）
+
