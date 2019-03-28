@@ -1,0 +1,10 @@
+Linux使用的是epoll事件复用+线程池的能力实现的AIO
+
+Linux平台下的NIO&AIO代码
+https://github.com/dstmath/OppoR15/tree/82333d7e123902505baf1827ba31fdf23cb6f6ba/app/src/main/java/sun/nio/ch
+
+epoll API文档以及介绍:
+https://blog.csdn.net/xiajun07061225/article/details/9250579
+
+主要的流程都是和bsd是相同的,只是底层使用的是epoll
+

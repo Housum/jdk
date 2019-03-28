@@ -2,6 +2,9 @@ MacOS BSD实现方式.
 
 采用的是KQueue的方式实现,底层还是使用的事件复用的方式
 
+
+BSD NIO&AIO代码:
+
 JDK KQueue.c:
 https://github.com/huangyazhe/openJdk/blob/64729a0d02b190ec2af4b18a4a2730dcad5c6191/jdk/src/solaris/native/sun/nio/ch/KQueue.c
 
