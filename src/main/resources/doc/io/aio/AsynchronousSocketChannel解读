@@ -1,0 +1,81 @@
+AsynchronousSocketChannel解读
+
+1.面向流的客户端channel,主要是通过两种方式进行创建,第一种是通过open的方式进行创建,这种方式创建的时候
+并没有bind,需要之后调用bind方法进行绑定. 第二种方式就是AsynchronousServerSocketChannel收到远程连接的时候(accept)的时候进行创建
+
+和AsynchronousServerSocketChannel中accept类似,只有在上一个read和write完成之后才能执行下一个read或者write操作.
+
+可是使用的TCP/IP的参数 见SocketChannel
+
+对于读写操作 也提供了超时时间的版本.如果超时之后还没有完成操作的话,那么就抛出InterruptedByTimeoutException
+
+2.方法分析
+
+构造函数
+和AsynchronousServerSocketChannel相同,提供了一个SPI给不同的平台实现,比如BSD底层使用的
+kqueue内核队列.
+protected AsynchronousSocketChannel(AsynchronousChannelProvider provider) {
+    this.provider = provider;
+}
+
+创建实例
+和AsynchronousServerSocketChannel相同,传入一个AsynchronousChannelGroup,其中实现了线程池
+以及事件复用功能
+public static AsynchronousSocketChannel open(AsynchronousChannelGroup group)
+    throws IOException
+{
+    AsynchronousChannelProvider provider = (group == null) ?
+        AsynchronousChannelProvider.provider() : group.provider();
+    return provider.openAsynchronousSocketChannel(group);
+}
+
+
+3.抽象方法
+
+关闭输入的通道 对于关闭之后,所有的读取操作都将会返回-1表示没有数据
+public abstract AsynchronousSocketChannel shutdownInput() throws IOException
+
+关闭输出的通道 在关闭之后 如果还有输出的话 那么将会抛出ClosedChannelException异常
+public abstract AsynchronousSocketChannel shutdownOutput() throws IOException
+
+如果已经连接上了的话 那么返回地址 如果没有连接 那么返回null 可以通过这个进行判断是否连接
+public abstract SocketAddress getRemoteAddress() throws IOException
+
+连接操作:
+这是使用回调的方式 如果连接成功或者连接失败的话 那么回调类CompletionHandler中的两个方法的其中
+一个 see doc/io/aio/CompletionHandler解读:10
+public abstract <A> void connect(SocketAddress remote,A attachment,CompletionHandler<Void,? super A> handler)
+这是是使用Future的方式 同时也可以通过Future进行判断操作是否成功 或者失败
+public abstract Future<Void> connect(SocketAddress remote)
+
+读操作:
+使用回调的方式 并且使用的是回调的方式 当超时的时候 将会收到InterruptedByTimeoutException异常(这个异常在回调中传入),在超时之后，如果还有其他的
+读取操作的话 那么会收到运行时异常.在handler的Integer为读取的字节数目 当没有数据的时候 那么返回-1.
+public abstract <A> void read(ByteBuffer dst,long timeout,TimeUnit unit,A attachment,CompletionHandler<Integer,? super A> handler)
+使用回调的方式 没有回调
+public final <A> void read(ByteBuffer dst,A attachment,CompletionHandler<Integer,? super A> handler){
+    //如果时间为0的话 那么就没有超时时间
+    read(dst, 0L, TimeUnit.MILLISECONDS, attachment, handler);
+}
+采用的是Future方式的读
+public abstract Future<Integer> read(ByteBuffer dst)
+切分读操作 将字节读到拆分到ByteBuffer到通道中
+public abstract <A> void read(ByteBuffer[] dsts, int offset,int length,long timeout,TimeUnit unit,A attachment,CompletionHandler<Long,? super A> handler)
+
+写操作:
+使用回调的方式 并且设置超时时间 参考read超时约束
+public abstract <A> void write(ByteBuffer src,long timeout,TimeUnit unit,A attachment,CompletionHandler<Integer,? super A> handler)
+没有超时时间的写
+public final <A> void write(ByteBuffer src,
+                            A attachment,
+                            CompletionHandler<Integer,? super A> handler)
+
+{
+    write(src, 0L, TimeUnit.MILLISECONDS, attachment, handler)
+}
+Future方法的写
+public abstract Future<Integer> write(ByteBuffer src)
+聚合写操作 将多个字节流写多一个通道中
+public abstract <A> void write(ByteBuffer[] srcs, int offset, int length, long timeout,TimeUnit unit,A attachment,CompletionHandler<Long,? super A> handler)
+
+
