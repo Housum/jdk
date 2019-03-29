@@ -14,6 +14,16 @@ AsynchronousChannel解读
 Future的mayInterruptIfRunning的时候,那么当关闭channel的时候,将会被中断,所以这种情况下的话,所以堵塞在Future的
 线程将会收到CancellationException异常,其他的IO操作将会收到AsynchronousCloseException异常
 
+和NIO的区别:
+对于注册的事件都是单次有效,被触发之后需要重新的注册
+见事件的注册:
+aio/bsd/KQueuePort.java:145
+aio/bsd/KQueuePort.java:145
+注册事件的时候都是带上一次的标示 表示注册单次
+见:JDKTest.testAsynchronousServerSocketChannel
+JDKTest.testAsynchronousSocketChannel
+在其中注册事件之后 被触发之后还需要进行注册
+
 
 2.两种任务的任务
 采用Future的方式
