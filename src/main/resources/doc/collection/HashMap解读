@@ -53,11 +53,12 @@ hash算法： (k.hash >> 16 ^ k.hash) | (n-1) n为table的大小
         1.如果是原有table中的元素没有hash冲突的情况下,通过hash&(n-1)重新设置（n = 新的capacity）
         2.如果是树节点,进行操作. 将树进行分割或者将数重新退化为链表
         3.如果是链表,那么有2中情况:（oldCap = 原有数组的capacity）
-            1.如果是不是在原来的(e.hash & oldCap) == 0，即不是在首位的,那么在新的
-            数组中位置是不变的.
-            2.如果(e.hash & oldCap) == 1,那么在新的数组中向右移动oldCap位置
+            1.如果是在原来的(e.hash & oldCap) == 0,那么将这部分数据放在原来的位置
+            就可以了 这样做法的好处是原来已经将这部分数据给打散了,不需要重新计算所处的位置
+            2.如果(e.hash & oldCap) == 1,如果已经超出的 为了将这部分给分散开来(因为首位1的占了一半的数量
+            ),那么在新的数组中在原有的位置向右移动oldCap位置,这里其实也是打散了
 
-(4).final Node<K,V> getNode(int hash, Object key)
+(4).final Node<K,V> getNode(INT hash, Object key)
 获取map中对于给定key的值,和插入相似,获取也大概分为几种情况:
     1.如果给定的hash没有冲突,那么table[hash&(n-1)]即为需要查询的元素
     2.如果给定的有冲突, 并且是一棵树的话,那么进行红黑树的查询
@@ -82,4 +83,4 @@ hashmap,因为是通过hash表实现的,所以为了减少hash冲突(冲突将�
 储存map中的元素,元素是Node. table的小于是capacity,实际储存是size
 (3).transient int size 真实的大小
 (4).transient int modCount 作为并发快速失败的计数器
-(5).final float loadFactor 加载因子,
+(5).final float loadFactor 加载因子,小于1 是一个百分比的数字 表示的是map中元素的数量和容量之笔
