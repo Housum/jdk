@@ -10,7 +10,7 @@ ThreadPoolExecutor解读
 2.3 停止线程池
 
 
-1.使用频率巨高的线程池（面试还常问0-0),一般情况下都会使用Executors工厂方法直接返回制定了参数的
+1.使用频率巨高的线程池,一般情况下都会使用Executors工厂方法直接返回制定了参数的
 线程池
 
 (1).构造函数中有几个很重要的参数：
@@ -99,15 +99,20 @@ public void execute(Runnable command) {
 
     //3.如果前面都不行的话,那么就直接尝试增加一个线程.如果不能的话 使用rejectHandler拒绝这个任务
     int c = ctl.get();
+    //这里是取出前三位 校验总数是否大于设置的核心线程数
     if (workerCountOf(c) < corePoolSize) {
+        //如果任务添加成功 工作线程也增加成功 直接返回
         if (addWorker(command, true))
             return;
         c = ctl.get();
     }
+    //如果添加当前的状态是正在运行以及添加任务成功
     if (isRunning(c) && workQueue.offer(command)) {
         int recheck = ctl.get();
+        //再次校验运行状态 如果不再运行了 那么回滚 并且执行rejectHandler逻辑
         if (! isRunning(recheck) && remove(command))
             reject(command);
+        //如果没有工作线程了 那么新增一个线程执行(非核心线程)
         else if (workerCountOf(recheck) == 0)
             addWorker(null, false);
     }
@@ -121,12 +126,17 @@ private boolean addWorker(Runnable firstTask, boolean core) {
     retry:
     for (;;) {
         int c = ctl.get();
+        //运行状态
         int rs = runStateOf(c);
 
         // 检查是否能够新增线程
-        //1.如果当前的状态是大于SHUTDOWN的 那么是不能新增的线程的
+        //1.如果当前的状态是大于SHUTDOWN的(状态越往后 数值越大) 那么是不能新增的线程的
         //2.处于SHUTDOWN状态 但是新增任务  不允许新增线程
         //3.处于SHUTDOWN状态 当前任务队列workQueue已经没有任务了 那么也不允许新增线程
+
+        //1.处于SHUTDOWN之后(STOP,TIDYING,TERMINATED) 那么不允许的添加新的任务的
+        //2.处于SHUTDOWN状态,但是新增了任务 那么是不允许的 返回上层任务添加失败
+        //3.处于SHUTDOWN状态,但是目前的任务队列已经全部执行完了,那么返回上层任务添加失败
         if (rs >= SHUTDOWN &&
             ! (rs == SHUTDOWN &&
                firstTask == null &&
@@ -144,10 +154,11 @@ private boolean addWorker(Runnable firstTask, boolean core) {
             if (compareAndIncrementWorkerCount(c))
                 break retry;
             c = ctl.get();
-            //重新校验 如果状态已经改变了 那么要从最开始检查 否则的话
-            //只需要判断配置的线程数目以及CAS设置工作线程数目了
+            //重新添加工作线程数目失败,那么需要重新开始,但是重新开始有两种选择 一种是从外循环开始 一种是从
+            //内循环开始 那么怎么决定呢? 是通过校验运行状态是否变化来决定的,如果运行没有变化 那么从内循环开始
+            //否则从外循环开始
             if (runStateOf(c) != rs)
-                //直接到外循环开始
+                //运行状态改变了 那么退到外循环开始
                 continue retry;
         }
     }
