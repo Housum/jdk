@@ -1,12 +1,79 @@
 CopyOnWriteArrayList解读
 
-1.作为一个线程安全的ArrayList,适合那种查询多,修改少的场景,因为内部的实现是通过每次修改内部的元素
-的适合都是通过copy一份新的数组实现(从名称可以看出来),因为实现的方式问题,所以读写可能会出现不一致的
+1.作为一个线程安全的ArrayList,适合那种查询多,修改少的场景,因为内部的实现是在每次有修改操作的话是通过替换内部底层数组
+copy一份新的数组实现(从名称可以看出来),因为实现的方式问题,所以读写可能会出现不一致的
 问题,比如：在读的过程中插入了新的元素,那么读的可能是旧的数组.其他操作也会有同一个问题. 所以针对那种
 强一致性的场景是不适合的
 
-2.使用案例：
+使用案例：
 @see java.sql.DriverManager
 
+2.属性
+final transient ReentrantLock lock = new ReentrantLock()
+该锁是为了使修改操作独占的
+
+private transient volatile Object[] array
+底层储存数据的数组
 
 
+
+
+3.新增:
+public E set(int index, E element) {
+        final ReentrantLock lock = this.lock;
+        //对写操作进行加锁 同一个时间只能有一个写操作 但是读操作是没有加锁的
+        lock.lock();
+        try {
+            Object[] elements = getArray();
+            E oldValue = get(elements, index);
+
+            if (oldValue != element) {
+                int len = elements.length;
+                //这一步是创建了一个新的数组 并且将新元素插入到其中
+                Object[] newElements = Arrays.copyOf(elements, len);
+                newElements[index] = element;
+                //这一步是将新数组设置到底层的数组中去
+                setArray(newElements);
+            } else {
+                // Not quite a no-op; ensures volatile write semantics
+                setArray(elements);
+            }
+            return oldValue;
+        } finally {
+            lock.unlock();
+        }
+}
+
+获取
+public E get(int index) {
+    //这里是不需要加锁的 不管插入操作是替换成新的数组了(插入了新的元素)  还是老得数组
+    return get(getArray(), index);
+}
+
+删除:
+public E remove(int index) {
+
+        //前面插入操作已经提到过 所有修改操作都需要加锁 独占
+        final ReentrantLock lock = this.lock;
+        lock.lock();
+        try {
+            Object[] elements = getArray();
+            int len = elements.length;
+            E oldValue = get(elements, index);
+            int numMoved = len - index - 1;
+            //删除的是最后一位
+            if (numMoved == 0)
+                setArray(Arrays.copyOf(elements, len - 1));
+            else {
+                Object[] newElements = new Object[len - 1];
+                System.arraycopy(elements, 0, newElements, 0, index);
+                System.arraycopy(elements, index + 1, newElements, index,
+
+                //同理 这也是忽略查找操作的 直接设置为删除了元素的新的数组
+                setArray(newElements);
+            }
+            return oldValue;
+        } finally {
+            lock.unlock();
+        }
+}

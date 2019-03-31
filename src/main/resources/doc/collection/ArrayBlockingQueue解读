@@ -76,11 +76,12 @@ put:
 public void put(E e) throws InterruptedException {
     checkNotNull(e);
     final ReentrantLock lock = this.lock;
+    //可中断
     lock.lockInterruptibly();
     try {
         //因为put是堵塞的方式的 所以如果已经满了的话 那么进行堵塞
         //直到有空间之后 才能插入元素. 这里使用while就是为了防止被唤醒
-        //之后又有其他的线程并发插入元素
+        //之后又有其他的线程并发插入元素,这样做就是唤醒之后再次检查是否有容量
         while (count == items.length)
             notFull.await();
         //添加元素
@@ -118,8 +119,8 @@ private void enqueue(E x) {
         // assert items[putIndex] == null;
         final Object[] items = this.items;
         items[putIndex] = x;
-        // 这里是插入之后 计算下一个插入的索引
-        // 采用的是环形的方式视同内部的数组
+        // 这里是在插入之后 计算下一个插入的索引
+        // 采用的是环形的方式使用内部的数组
         if (++putIndex == items.length)
             putIndex = 0;
         count++;
@@ -288,7 +289,7 @@ int takeIndex; 获取数据的索引 从0开始,一直到capacity-1,
 
 int putIndex;
 插入元素的索引,和takeIndex差不多的含义,也是从0开始的
-知道capacity-1
+直到capacity-1
 
 int count;
 数组中元素的总个数
@@ -298,10 +299,10 @@ final ReentrantLock lock;
 锁进行保护
 
 private final Condition notEmpty;
-获取数据的Condition
+获取数据的Condition 当没有元素的时候 使用await堵塞获取的操作
 
 private final Condition notFull;
-插入元素的Condition
+插入元素的Condition 当没有空间插入的时候 使用await堵塞获取的操作
 
 
 
