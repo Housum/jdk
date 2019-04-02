@@ -4,7 +4,7 @@ Future解读
 
 2.接口方法
 //取消任务 如果任务已经完成了,或者已经取消了或者其他的一些原因
-//那么将就取消失败 对于取消的任务任务表现的形式也为done
+//那么将就取消失败 对于取消的任务表现的形式也为done
 //mayInterruptIfRunning 是否中断在get上面等待的线程,如果非中断的话那么
 //那么堵塞的线程可能会获得结果 参考: FutureTask
 boolean cancel(boolean mayInterruptIfRunning);
