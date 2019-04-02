@@ -178,9 +178,11 @@ private boolean addWorker(Runnable firstTask, boolean core) {
             try {
                 int rs = runStateOf(ctl.get());
 
-                //判断状态 线程不能启动
+                //判断状态 如果状态处于SHUTDOWN之前(RUNNING)
+                //或者是SHUTDOWN状态下 新增执行线程去执行之前的任务
                 if (rs < SHUTDOWN ||
                     (rs == SHUTDOWN && firstTask == null)) {
+                    //检查添加的线程是否能够启动
                     if (t.isAlive()) // precheck that t is startable
                         throw new IllegalThreadStateException();
                     workers.add(w);
@@ -226,6 +228,7 @@ private final class Worker
         }
 
         /** Delegates main run loop to outer runWorker  */
+        //这里是主要的获取提交任务并且执行的方法
         public void run() {
             runWorker(this);
         }
@@ -233,6 +236,7 @@ private final class Worker
             return getState() != 0;
         }
 
+        //独占方式获得锁 非公平
         protected boolean tryAcquire(int unused) {
             if (compareAndSetState(0, 1)) {
                 setExclusiveOwnerThread(Thread.currentThread());
@@ -266,13 +270,14 @@ private final class Worker
 final void runWorker(Worker w) {
         Thread wt = Thread.currentThread();
 
-        //如果第一个任务存在话 那么先执行第一个任务
+        //如果第一个任务存在话 那么先执行第一个任务 这个任务是创建worker的时候传入的
         Runnable task = w.firstTask;
         w.firstTask = null;
         w.unlock(); // allow interrupts
         //这个字段标示线程是否是正常的退出
         boolean completedAbruptly = true;
         try {
+            //这里如果返回了获得任务返回了null 代表的是工作线程退出
             while (task != null || (task = getTask()) != null) {
                 w.lock();
 
@@ -327,6 +332,7 @@ private Runnable getTask() {
         int c = ctl.get();
         int rs = runStateOf(c);
 
+        //状态在STOP之后 或者 状态在SHUTDOWN之后 并且工作队列为空
         if (rs >= SHUTDOWN && (rs >= STOP || workQueue.isEmpty())) {
             decrementWorkerCount();
             return null;
