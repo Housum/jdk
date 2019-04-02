@@ -1,0 +1,111 @@
+Striped64解读
+
+1.
+因为long和double在底层的计算机储存中不是原子的 所以对于竞争的情况下 为了保证这部分的原子性
+就牺牲一部分的性能
+
+这是一个package access的抽象类,主要做的功能就是并发计数器(比Atomic*的性能更高),实现的方式是在没有
+竞争的时候使用的long计算,但是在并发高的时候底层使用的是采用多个Cell保存计算结果,在返回的时候再将其累加起来
+这样能够减少锁的竞争
+
+实现原理和ConcurrentHashMap中计算总数是一样的,见:doc/collection/ConcurrentHashMap解读:170
+
+2.数据结构
+
+transient volatile Cell[] cells
+一个数组 其中每个储存的都是数量 返回的时候将其累加
+
+transient volatile long base
+在没有竞争的时候 使用该基础类型进行统计
+
+transient volatile int cellsBusy
+对于cells进行更改时候的自旋字段 0表示没有竞争 1表示资源已经被占用
+
+3.核心方法
+计算long的增加
+x 增加的数目
+fn 操作 可以为null 如果为null 那么就是简单的增加
+wasUncontended 如果是cas失败的话 传入的是false
+final void longAccumulate(long x, LongBinaryOperator fn,
+                              boolean wasUncontended) {
+        int h;
+        //getProbe()获取的是ThreadLocalRandom的随机因子 相当于线程的hashcode
+        //如果没有初始化 调用其方法使其初始化
+        if ((h = getProbe()) == 0) {
+            ThreadLocalRandom.current(); // force initialization
+            h = getProbe();
+            wasUncontended = true;
+        }
+        boolean collide = false;                // True if last slot nonempty
+        for (;;) {
+            Cell[] as; Cell a; int n; long v;
+            if ((as = cells) != null && (n = as.length) > 0) {
+                if ((a = as[(n - 1) & h]) == null) {
+                    if (cellsBusy == 0) {       // Try to attach new Cell
+                        Cell r = new Cell(x);   // Optimistically create
+                        if (cellsBusy == 0 && casCellsBusy()) {
+                            boolean created = false;
+                            try {               // Recheck under lock
+                                Cell[] rs; int m, j;
+                                if ((rs = cells) != null &&
+                                    (m = rs.length) > 0 &&
+                                    rs[j = (m - 1) & h] == null) {
+                                    rs[j] = r;
+                                    created = true;
+                                }
+                            } finally {
+                                cellsBusy = 0;
+                            }
+                            if (created)
+                                break;
+                            continue;           // Slot is now non-empty
+                        }
+                    }
+                    collide = false;
+                }
+                else if (!wasUncontended)       // CAS already known to fail
+                    wasUncontended = true;      // Continue after rehash
+                else if (a.cas(v = a.value, ((fn == null) ? v + x :
+                                             fn.applyAsLong(v, x))))
+                    break;
+                else if (n >= NCPU || cells != as)
+                    collide = false;            // At max size or stale
+                else if (!collide)
+                    collide = true;
+                else if (cellsBusy == 0 && casCellsBusy()) {
+                    try {
+                        if (cells == as) {      // Expand table unless stale
+                            Cell[] rs = new Cell[n << 1];
+                            for (int i = 0; i < n; ++i)
+                                rs[i] = as[i];
+                            cells = rs;
+                        }
+                    } finally {
+                        cellsBusy = 0;
+                    }
+                    collide = false;
+                    continue;                   // Retry with expanded table
+                }
+                h = advanceProbe(h);
+            }
+            else if (cellsBusy == 0 && cells == as && casCellsBusy()) {
+                boolean init = false;
+                try {                           // Initialize table
+                    if (cells == as) {
+                        Cell[] rs = new Cell[2];
+                        rs[h & 1] = new Cell(x);
+                        cells = rs;
+                        init = true;
+                    }
+                } finally {
+                    cellsBusy = 0;
+                }
+                if (init)
+                    break;
+            }
+            else if (casBase(v = base, ((fn == null) ? v + x :
+                                        fn.applyAsLong(v, x))))
+                break;                          // Fall back on using base
+        }
+}
+
