@@ -1,4 +1,11 @@
 AtomicIntegerArray解读
 
-1.int的数组 提供了对数组中单个元素的原子操作,底层使用的是CAS的方式
+1.int的数组 提供了对数组中单个元素的原子操作,底层使用的是CAS的方式进行单个元素的设置
 
+使用的是Unsafe的CAS以及arrayBaseOffset以及arrayIndexScale实现,见:https://www.cnblogs.com/mickole/articles/3757278.html
+
+2.属性
+private final int[] array
+存储数据的数组
+
+3.方法

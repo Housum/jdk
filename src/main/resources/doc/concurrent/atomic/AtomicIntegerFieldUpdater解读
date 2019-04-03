@@ -1,0 +1,3 @@
+AtomicIntegerFieldUpdater解读
+
+1.对对象中为int的字段进行原子操作,该int字段必须volatile秒速的
