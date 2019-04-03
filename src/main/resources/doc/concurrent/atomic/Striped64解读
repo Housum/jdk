@@ -1,11 +1,11 @@
 Striped64解读
 
 1.
-因为long和double在底层的计算机储存中不是原子的 所以对于竞争的情况下 为了保证这部分的原子性
+因为long和double在底层的计算机储存中是分为两个32位进行读写 所以对于竞争的情况下 为了保证这部分的原子性
 就牺牲一部分的性能
 
 这是一个package access的抽象类,主要做的功能就是并发计数器(比Atomic*的性能更高),实现的方式是在没有
-竞争的时候使用的long计算,但是在并发高的时候底层使用的是采用多个Cell保存计算结果,在返回的时候再将其累加起来
+竞争的时候使用的long计算,但是在并发高的时候底层使用的是采用多个Cell保存计算结果(每个Cell保存的long值),在返回的时候再将其累加起来
 这样能够减少锁的竞争
 
 实现原理和ConcurrentHashMap中计算总数是一样的,见:doc/collection/ConcurrentHashMap解读:170
@@ -36,44 +36,60 @@ final void longAccumulate(long x, LongBinaryOperator fn,
             h = getProbe();
             wasUncontended = true;
         }
+        //记录的是数组中的元素是否有多个线程同时向其写入数据
         boolean collide = false;                // True if last slot nonempty
         for (;;) {
             Cell[] as; Cell a; int n; long v;
+            //如果已经初始化过cells(有过竞争)
             if ((as = cells) != null && (n = as.length) > 0) {
+                //计算数组中当前线程对应的元素是否被初始化
                 if ((a = as[(n - 1) & h]) == null) {
+                    //cellsBusy 是一个自选锁控制位 当为0的时候 表示的是没有被使用
                     if (cellsBusy == 0) {       // Try to attach new Cell
                         Cell r = new Cell(x);   // Optimistically create
+                        //再次进行检查 并且采用cas的方式将其设置为1 表示被占用了
                         if (cellsBusy == 0 && casCellsBusy()) {
                             boolean created = false;
                             try {               // Recheck under lock
                                 Cell[] rs; int m, j;
+                                //这里再次检查的原因是有可能上一个线程将当前线程对应的
+                                //槽位的元素初始化了,所以需要进行校验 是否存在
                                 if ((rs = cells) != null &&
                                     (m = rs.length) > 0 &&
                                     rs[j = (m - 1) & h] == null) {
+                                    //如果对应的槽位没有被初始化 那么进行初始化操作
                                     rs[j] = r;
                                     created = true;
                                 }
                             } finally {
                                 cellsBusy = 0;
                             }
+                            //如果已经创建了 那么结束操作
                             if (created)
                                 break;
+                            //如果是被上一个线程把槽位给占用了 那么所要做的就是将数值增加到对应的槽位上面
                             continue;           // Slot is now non-empty
                         }
                     }
                     collide = false;
                 }
+                //如果对于槽位非空的话 重置为没有竞争 下一次将执行cas 增加对应槽位的数值
                 else if (!wasUncontended)       // CAS already known to fail
                     wasUncontended = true;      // Continue after rehash
+                //通过cas的方式重新设置只 如果传入的fn为空的话 那么简单的增加数值就可以了
                 else if (a.cas(v = a.value, ((fn == null) ? v + x :
                                              fn.applyAsLong(v, x))))
                     break;
                 else if (n >= NCPU || cells != as)
                     collide = false;            // At max size or stale
                 else if (!collide)
+                    //标记槽位已经被全部占满了 那么如果下一次还是不能将值加入到对应的槽位中的话 就进行扩容 扩容
+                    //到原来的2倍
                     collide = true;
+                //可以的话 进行扩瞳
                 else if (cellsBusy == 0 && casCellsBusy()) {
                     try {
+                        //cells == as是为了校验是否被扩容过
                         if (cells == as) {      // Expand table unless stale
                             Cell[] rs = new Cell[n << 1];
                             for (int i = 0; i < n; ++i)
@@ -86,8 +102,10 @@ final void longAccumulate(long x, LongBinaryOperator fn,
                     collide = false;
                     continue;                   // Retry with expanded table
                 }
+                //给当前的ThreadLocalRandom设置一个新的hashCode
                 h = advanceProbe(h);
             }
+            //这是另一分支 cells没有被初始化过 进行初始化
             else if (cellsBusy == 0 && cells == as && casCellsBusy()) {
                 boolean init = false;
                 try {                           // Initialize table
@@ -103,9 +121,23 @@ final void longAccumulate(long x, LongBinaryOperator fn,
                 if (init)
                     break;
             }
+            //最后其他方式都不行的话 退回到原来的方式进行尝试
             else if (casBase(v = base, ((fn == null) ? v + x :
                                         fn.applyAsLong(v, x))))
                 break;                          // Fall back on using base
         }
 }
+
+4.已知子类
+子类分为两种 *Addr *Accumulator
+Addr为计数器 从0开始增加
+Accumulator 为累加器 可以指定初始值 然后通过传入的函数进行每次数值上面的累加算法
+
+子类
+LongAddr 针对long的计数器
+LongAccumulator 针对long的累加器
+
+DoubleAddr 针对double的计数器
+DoubleAccumulator 针对double的累加器
+
 
