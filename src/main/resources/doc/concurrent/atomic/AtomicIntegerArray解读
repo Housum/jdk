@@ -1,0 +1,4 @@
+AtomicIntegerArray解读
+
+1.int的数组 提供了对数组中单个元素的原子操作,底层使用的是CAS的方式
+
