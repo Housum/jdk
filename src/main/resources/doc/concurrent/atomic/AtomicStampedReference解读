@@ -1,0 +1,7 @@
+AtomicStampedReference解读
+
+1.给对象进行进行标记,和AtomicMarkableReference不同地方在于使用的是int进行标记,这样可以给每次修改的
+对象进行打上唯一的戳
+
+实现的方式基本上和AtomicMarableReference一样,使用了内部类Pair方式进行封装,设置的时候通过CAS的方式进行
+比较并且设置

@@ -9,3 +9,12 @@ private final int[] array
 存储数据的数组
 
 3.方法
+其中分析一个方法
+设置数组索引的数值
+public final boolean compareAndSet(int i, int expect, int update) {
+    return compareAndSetRaw(checkedByteOffset(i), expect, update);
+}
+
+4.类似的类有
+AtomicLongArray
+AtomicReferenceArray
