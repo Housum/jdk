@@ -1,0 +1,35 @@
+AtomicMarkableReference解读
+
+1.对对象进行标记,标记可以被原子的操作,其中底层是将对象和标记位封装成一个对象,对这个对象进行CAS设置
+
+2.属性
+private volatile Pair<V> pair
+其中封装了对象和标记位
+private static class Pair<T> {
+    final T reference;
+    final boolean mark;
+    private Pair(T reference, boolean mark) {
+        this.reference = reference;
+        this.mark = mark;
+    }
+    static <T> Pair<T> of(T reference, boolean mark) {
+        return new Pair<T>(reference, mark);
+    }
+}
+
+3.方法
+其中一个方法分析
+CAS设置
+public boolean compareAndSet(V       expectedReference,
+                             V       newReference,
+                             boolean expectedMark,
+                             boolean newMark) {
+    采用CAS的方式进行设置(先进行判断 减少CAS的机会)
+    Pair<V> current = pair;
+    return
+        expectedReference == current.reference &&
+        expectedMark == current.mark &&
+        ((newReference == current.reference &&
+          newMark == current.mark) ||
+         casPair(current, Pair.of(newReference, newMark)));
+}

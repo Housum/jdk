@@ -1,3 +1,24 @@
 AtomicIntegerFieldUpdater解读
 
-1.对对象中为int的字段进行原子操作,该int字段必须volatile秒速的
+1.对对象中为int的字段进行原子操作,该int字段必须volatile修饰(保证了原子性),底层也是通过Unsafe的CAS方式进行设置
+
+该类是一个抽象类,提供了创建实例的能力
+
+创建实例 传入类和字段
+public static <U> AtomicIntegerFieldUpdater<U> newUpdater(Class<U> tclass,
+                                                          String fieldName) {
+    return new AtomicIntegerFieldUpdaterImpl<U>
+        (tclass, fieldName, Reflection.getCallerClass());
+}
+
+2.方法
+设置:
+public abstract void set(T obj, int newValue)
+将对账的int字段设置为新值
+
+public abstract boolean compareAndSet(T obj, int expect, int update)
+采用CAS的方式设置int类型的值
+
+4.同理相似的类有:
+AtomicLongFieldUpdater
+AtomicReferenceFieldUpdater
