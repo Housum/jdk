@@ -240,7 +240,7 @@ public class JDKTest<K extends Object & Map, V> implements Serializable {
 
 //        testReentrantLockInterrupt();
 
-//        testAQSCondition();
+        testAQSCondition();
 
 //        testPrintThreadPoolStatus();
 
@@ -255,18 +255,18 @@ public class JDKTest<K extends Object & Map, V> implements Serializable {
 //        testServiceSocketChannel();
 
 
-        new Thread(() -> {
-            try {
-                testAsynchronousServerSocketChannel();
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        }).start();
-        TimeUnit.SECONDS.sleep(2);
-        testAsynchronousSocketChannel();
-
-
-        TimeUnit.SECONDS.sleep(1000);
+//        new Thread(() -> {
+//            try {
+//                testAsynchronousServerSocketChannel();
+//            } catch (Exception e) {
+//                e.printStackTrace();
+//            }
+//        }).start();
+//        TimeUnit.SECONDS.sleep(2);
+//        testAsynchronousSocketChannel();
+//
+//
+//        TimeUnit.SECONDS.sleep(1000);
     }
 
 
@@ -1249,15 +1249,15 @@ public class JDKTest<K extends Object & Map, V> implements Serializable {
 
         ReentrantLock reentrantLock = new ReentrantLock();
         Condition condition = reentrantLock.newCondition();
-
-        try {
-            //евЁЖ IllegalMonitorStateException
-//            condition.await();
-        } catch (Exception e) {
-            e.printStackTrace();
-        } finally {
-//            reentrantLock.unlock();
-        }
+//
+//        try {
+//            //евЁЖ IllegalMonitorStateException
+////            condition.await();
+//        } catch (Exception e) {
+//            e.printStackTrace();
+//        } finally {
+////            reentrantLock.unlock();
+//        }
 
 
         Thread h1 = new Thread(() -> {
@@ -1273,11 +1273,16 @@ public class JDKTest<K extends Object & Map, V> implements Serializable {
                 reentrantLock.unlock();
             }
         });
+
+
+        h1.start();
+
+
         Thread h2 = new Thread(() -> {
             reentrantLock.lock();
             try {
                 log("before signal");
-//                condition.signal();
+                condition.signal();
                 log("afters signal");
             } catch (Exception e) {
                 e.printStackTrace();
@@ -1287,7 +1292,6 @@ public class JDKTest<K extends Object & Map, V> implements Serializable {
             }
         });
 
-        h1.start();
         h2.start();
         TimeUnit.SECONDS.sleep(2);
 
