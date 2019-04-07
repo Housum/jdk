@@ -10,6 +10,7 @@ AbstractQueuedSynchronizer 解读
 4 内部类
 4.1 Node节点
 4.2 ConditionObject节点（待填坑）
+5.AQS内部的其他方式
 
 CLK自旋锁：https://www.cnblogs.com/llkmst/p/4895478.html
 
@@ -296,7 +297,7 @@ CLK队列中,当其他线程释放资源的时候,就会按照head的后续节�
 (3).获取锁
 //@param arg 传入的参数
 public final void acquireShared(int arg) {
-    //如果获取到资源,那么进入到队列中并且等待被唤醒
+    //如果小于0不能获取到资源,那么进入到队列中并且等待被唤醒,如果返回大于0 那么直接就返回了
     if (tryAcquireShared(arg) < 0)
         doAcquireShared(arg);
 }
@@ -513,6 +514,55 @@ private void doSignalAll(Node first) {
         first = next;
     } while (first != null);
 }
+
+5.AQS内部的方法
+protected final Thread getExclusiveOwnerThread()
+当是独占的模式的时候 返回独占锁所属的线程,如果没有返回null
+
+public final Collection<Thread> getExclusiveQueuedThreads()
+返回独占模式下 等待的线程
+
+public final Thread getFirstQueuedThread()
+获取在CLK队列中等待最久的元素,一般都是head的next元素
+
+public final Collection<Thread> getQueuedThreads()
+返回CLK中的所有线程
+
+public final int getQueueLength()
+返回CLK队列的长度
+
+public final Collection<Thread> getSharedQueuedThreads()
+返回共享锁下的等待线程
+
+public final Collection<Thread> getWaitingThreads(ConditionObject condition)
+返回await Condition下的线程
+
+public final int getWaitQueueLength(ConditionObject condition)
+返回await Condition下的线程节点的长度
+
+public final boolean hasContended()
+是否发生了竞争
+
+public final boolean hasQueuedPredecessors()
+判断队列中是存在除了调用线程之外其他的线程节点
+
+public final boolean hasQueuedThreads()
+队列中是否有节点
+
+public final boolean hasWaiters(ConditionObject condition)
+是否有线程await在Condition上面
+
+public final boolean isQueued(Thread thread)
+指定线程是否在队列中
+
+public final boolean owns(ConditionObject condition)
+调用该ConditionObject是由当前的Lock锁创建的
+
+
+
+
+
+
 
 
 

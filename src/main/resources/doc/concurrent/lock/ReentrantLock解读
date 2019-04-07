@@ -1,0 +1,168 @@
+ReentrantLock解读
+
+1.可重入锁,和synchronized具有相同的语意,当lock的时候成功的获取到锁的话立马返回,否则的话
+一直堵塞到锁资源被释放
+
+构造的时候可以指定是否是公平的,如果是公平的话那么遵守线程的FIFO获得锁资源,如果是非公平的话
+那么将不满足FIFO,公平的争夺锁(这样可能导致饥饿).默认情况下创建的是非公平的
+
+2.属性
+private final Sync sync
+内部类,AQS的子类,主类就是为了实现锁的能力
+
+3.实现原理分析
+实现了AQS,完成基本的功能,子类分为公平和非公平,只有独占的实现
+
+当AQS中的states为0那么表示的是锁没有被占用,大于0的话表示的是被占用了,同时表示的也是获取
+锁的次数,这样可以实现重入的功能
+
+公平锁和非公平锁的基类
+abstract static class Sync extends AbstractQueuedSynchronizer {
+        private static final long serialVersionUID = -5179523762034025860L;
+
+        //子类实现 进行加锁
+        abstract void lock();
+
+        //实现非公平的加锁
+        final boolean nonfairTryAcquire(int acquires) {
+            final Thread current = Thread.currentThread();
+            int c = getState();
+            //如果是0 那么表示的是锁没有被占用 使用CAS设置states,如果设置成功的话
+            //那么获得锁 并且将当前线程设置为独占的线程
+            if (c == 0) {
+                if (compareAndSetState(0, acquires)) {
+                    //获取锁成功 将当前的锁设置为独占
+                    setExclusiveOwnerThread(current);
+                    return true;
+                }
+            }
+            //如果states不为0的话 那么进行校验 是否是重入 如果是重入的话 那么将states加1
+            else if (current == getExclusiveOwnerThread()) {
+                int nextc = c + acquires;
+                //如果已经超过int的范围 直接抛出异常
+                if (nextc < 0) // overflow
+                    throw new Error("Maximum lock count exceeded");
+                //设置states
+                setState(nextc);
+                return true;
+            }
+            //否则返回获取失败
+            return false;
+        }
+
+        //释放锁
+        protected final boolean tryRelease(int releases) {
+            //将states减1
+            int c = getState() - releases;
+            //显然 只有持有锁的线程 才能通过release释放锁
+            if (Thread.currentThread() != getExclusiveOwnerThread())
+                throw new IllegalMonitorStateException();
+            boolean free = false;
+            如果已经将锁已经全部释放的话 那么将独占锁清空 当前锁空闲
+            if (c == 0) {
+                free = true;
+                setExclusiveOwnerThread(null);
+            }
+            setState(c);
+            //返回true 表示释放锁成功
+            return free;
+        }
+
+        //返回是否持有独占锁
+        protected final boolean isHeldExclusively() {
+            // While we must in general read state before owner,
+            // we don't need to do so to check if current thread is owner
+            return getExclusiveOwnerThread() == Thread.currentThread();
+        }
+
+        //创建一个Condition
+        final ConditionObject newCondition() {
+            return new ConditionObject();
+        }
+
+        //其他的线程可以通过这个方法返回当前独占锁的线程是谁
+        final Thread getOwner() {
+            return getState() == 0 ? null : getExclusiveOwnerThread();
+        }
+        //返回当前重入的次数 如果没有持有锁的话 那么返回0
+        final int getHoldCount() {
+            return isHeldExclusively() ? getState() : 0;
+        }
+
+        //是否持有锁
+        final boolean isLocked() {
+            return getState() != 0;
+        }
+
+        //反序列化
+        private void readObject(java.io.ObjectInputStream s)
+            throws java.io.IOException, ClassNotFoundException {
+            s.defaultReadObject();
+            setState(0); // reset to unlocked state
+        }
+}
+公平锁实现:
+static final class FairSync extends Sync {
+        private static final long serialVersionUID = -3000897897090466540L;
+
+        final void lock() {
+            //见 《AbstractQueuedSynchronizer解读》
+            acquire(1);
+        }
+
+        //在调用acquire的时候将就调用此方法
+        protected final boolean tryAcquire(int acquires) {
+            final Thread current = Thread.currentThread();
+            int c = getState();
+            //如果当前没有被线程占用 并且CLK队列中没有线程节点 那么将states设置
+            //表示被当前占用,hasQueuedPredecessors就是为了校验CLK队列中是否还有元素
+            //这样就可以达到公平了
+            if (c == 0) {
+                if (!hasQueuedPredecessors() &&
+                    compareAndSetState(0, acquires)) {
+                    setExclusiveOwnerThread(current);
+                    return true;
+                }
+            }
+            //如果是重入的话
+            else if (current == getExclusiveOwnerThread()) {
+                int nextc = c + acquires;
+                if (nextc < 0)
+                    throw new Error("Maximum lock count exceeded");
+                setState(nextc);
+                return true;
+            }
+            return false;
+        }
+}
+非公平锁:
+static final class NonfairSync extends Sync {
+        private static final long serialVersionUID = 7316153563782823691L;
+
+        final void lock() {
+            //如果能够直接抢占的话 当前线程直接拿到锁资源
+            //否则走正常的流程
+            if (compareAndSetState(0, 1))
+                setExclusiveOwnerThread(Thread.currentThread());
+            else
+                acquire(1);
+        }
+
+        protected final boolean tryAcquire(int acquires) {
+            //非公平的获取锁
+            return nonfairTryAcquire(acquires);
+        }
+}
+
+4.方法实现
+返回当前的锁持有的次数
+public int getHoldCount() {
+    return sync.getHoldCount();
+}
+
+返回当前锁被哪个线程给独占了
+protected Thread getOwner() {
+    return sync.getOwner();
+}
+
+其他的方法都是使用了AQS中的方法进行封装

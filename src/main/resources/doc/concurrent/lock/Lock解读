@@ -1,0 +1,30 @@
+Lock解读
+
+1.显示锁,和synchronized不同的在于需要定义的,并且提供了更加灵活的使用方法,比如可中断的,可尝试的获取tryLock,以及关联
+的Condition,可实现wait和notify的功能
+
+所有的Lock都是基于AQS实现的,分为公平锁和非公平锁之分
+
+2.Lock的方法
+void lock()
+试图获取锁 如果没有获取失败的话 一直堵塞直到有资源为止
+
+void lockInterruptibly() throws InterruptedException
+如果堵塞的话 可中断
+
+boolean tryLock()
+试图去获取锁 如果失败的话 那么返回false
+
+boolean tryLock(long time, TimeUnit unit) throws InterruptedException
+试图去获取锁 如果失败的话 尝试一段时间 可中断
+
+void unlock()
+释放锁资源,为了防止失败 放在finally 块中进行执行:
+try{
+    lock.lock();
+}finally{
+    lock.unlock();
+}
+
+Condition newCondition()
+返回一个关联的Condition,详情见《AbstractQueuedSynchronizer解读》
