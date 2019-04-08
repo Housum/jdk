@@ -1,6 +1,6 @@
 AtomicIntegerFieldUpdater解读
 
-1.对对象中为int的字段进行原子操作,该int字段必须volatile修饰(保证了原子性),底层也是通过Unsafe的CAS方式进行设置
+1.对对象中为int的字段进行原子操作,该int字段必须volatile修饰(保证了可见性),底层也是通过Unsafe的CAS方式进行设置
 
 该类是一个抽象类,提供了创建实例的能力
 
