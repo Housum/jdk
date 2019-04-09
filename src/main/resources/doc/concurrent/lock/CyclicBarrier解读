@@ -1,0 +1,145 @@
+CyclicBarrier解读
+
+1.看名字就知道是干嘛的,是一个栅栏-就是可以设置有多少个线程完全到达知道才会往下执行逻辑
+
+实现的原理就是使用了ReentrantLock以及Condition,初始化的时候设置多少个线程到达才算是线程全部到达,如果没有达到数目那么
+通过Condition的await堵塞 如果达到数目之后,那么通过signalAll 唤醒所有的线程
+
+2.属性
+private final ReentrantLock lock = new ReentrantLock()
+对总数计算的时候加锁
+
+private final Condition trip = lock.newCondition()
+堵塞直到被触发
+
+private final int parties
+定义的线程总数目
+
+private final Runnable barrierCommand
+当达到数目之后执行命令,可以为null
+
+private int count
+还有多少剩余线程需要达到才能够触发唤醒
+
+private Generation generation = new Generation()
+每一次CyclicBarrier运行都对应了单独的一个generation,其中记录了是否被中断
+比如当全部线程都到达之后会被signalAll,之后通过reset重新使用该CyclicBarrier的话
+那么创建了新的generation
+
+
+3.实现原理
+线程等待:
+public int await() throws InterruptedException, BrokenBarrierException {
+    try {
+        return dowait(false, 0L);
+    } catch (TimeoutException toe) {
+        throw new Error(toe); // cannot happen
+    }
+}
+等待的主要逻辑 参数可传入超时版本
+private int dowait(boolean timed, long nanos)
+        throws InterruptedException, BrokenBarrierException,
+               TimeoutException {
+        final ReentrantLock lock = this.lock;
+        lock.lock();
+        try {
+            final Generation g = generation;
+
+            //如果已经被中断了 那么抛出移除
+            if (g.broken)
+                throw new BrokenBarrierException();
+
+            //线程被中断 打破等待
+            if (Thread.interrupted()) {
+                breakBarrier();
+                throw new InterruptedException();
+            }
+            //将总数减少1
+            int index = --count;
+            //当为0的时候 表示已经满足条件了 那么触发
+            if (index == 0) {  // tripped
+                boolean ranAction = false;
+                try {
+                    //如果存在传入的满足条件之后执行的任务 那么执行任务
+                    final Runnable command = barrierCommand;
+                    if (command != null)
+                        command.run();
+                    ranAction = true;
+                    nextGeneration();
+                    return 0;
+                } finally {
+                    //有可能没有执行 那么这里进行执行
+                    if (!ranAction)
+                        breakBarrier();
+                }
+            }
+
+            //一直循环 直到超时被中断或者被唤醒
+            for (;;) {
+                try {
+                    //如果设置了时间的话 那么等待一段时间 超时抛出移除
+                    //如果是没有设置的话 那么一直等待 直到signal信号
+                    if (!timed)
+                        trip.await();
+                    else if (nanos > 0L)
+                        nanos = trip.awaitNanos(nanos);
+                } catch (InterruptedException ie) {
+                    //如果被中断过 设置中断状态
+                    if (g == generation && ! g.broken) {
+                        breakBarrier();
+                        throw ie;
+                    } else {
+                        // We're about to finish waiting even if we had not
+                        // been interrupted, so this interrupt is deemed to
+                        // "belong" to subsequent execution.
+                        //将当前的线程中断状态重新设置为true
+                        Thread.currentThread().interrupt();
+                    }
+                }
+                //如果之前已经被中断了 那么抛出移除
+                if (g.broken)
+                    throw new BrokenBarrierException();
+
+                if (g != generation)
+                    return index;
+
+                if (timed && nanos <= 0L) {
+                    breakBarrier();
+                    throw new TimeoutException();
+                }
+            }
+        } finally {
+            lock.unlock();
+        }
+}
+重新初始化状态 可从新使用
+public void reset() {
+        final ReentrantLock lock = this.lock;
+        lock.lock();
+        try {
+            //中断当前等待的线程
+            breakBarrier();
+            //设置下一个执行的生命周期
+            nextGeneration();
+        } finally {
+            lock.unlock();
+        }
+}
+将当前的cyclicBarrier设置为中断 并且将所有等待的线程唤醒
+private void breakBarrier() {
+    generation.broken = true;
+    count = parties;
+    //唤醒
+    trip.signalAll();
+}
+生成下一个执行生命周期
+private void nextGeneration() {
+    // signal completion of last generation
+    trip.signalAll();
+    // set up next generation
+    count = parties;
+    //指向新的generation
+    generation = new Generation();
+}
+
+

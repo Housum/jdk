@@ -1,0 +1,49 @@
+CountDownLatch解读
+
+1.计数门阀,主要的作用就是初始化一个计数器,通过其他的线程调用countDown一直到数值为0然后堵塞的线程被唤醒
+
+实现原理:使用了AQS的共享模式
+
+private static final class Sync extends AbstractQueuedSynchronizer {
+        private static final long serialVersionUID = 4982264981922014374L;
+
+        //设置为初始化等待的数目
+        Sync(int count) {
+            setState(count);
+        }
+
+        int getCount() {
+            return getState();
+        }
+
+        //await等待 只有不是0 那么就会堵塞(AQS共享时候 返回小于0表示不能获取到资源
+        //进入睡眠状态)
+        protected int tryAcquireShared(int acquires) {
+            return (getState() == 0) ? 1 : -1;
+        }
+
+        //释放资源 在countDown的时候调用 一直减少到0为止
+        protected boolean tryReleaseShared(int releases) {
+            // Decrement count; signal when transition to zero
+            for (;;) {
+                int c = getState();
+                //返回false 不做操作
+                if (c == 0)
+                    return false;
+                //减少数目 如果为0 那么返回true 进行唤醒操作
+                int nextc = c-1;
+                if (compareAndSetState(c, nextc))
+                    return nextc == 0;
+            }
+        }
+}
+
+2.方法实现
+public void await() throws InterruptedException {
+   // tryAcquireShared 中判断不为0的时候将会导致堵塞
+    sync.acquireSharedInterruptibly(1);
+}
+public void countDown() {
+        //tryReleaseShared中将数目减1 直到0的时候见就唤醒其他的节点
+        sync.releaseShared(1);
+}

@@ -364,9 +364,9 @@ public final boolean releaseShared(int arg) {
     }
     return false;
 }
-//这个方法需要结合doAcquireShared中的setHeadAndPropagate方法一起看，在这里释放的后继节点之后
-//后继节点作为head节点之后还会调用doReleaseShared方法,如果有资源的话,那么后继节点会一直被唤醒
-//直到其中的某一个几点不满足tryAcquireShared(arg) >0 为止
+//这个方法需要结合doAcquireShared和其中的setHeadAndPropagate方法一起看,如果在该方法中head节点的后继节点被唤醒之后,在doAcquireShared
+//中再次通过tryReleaseShared判断后继节点是否能够获取到资源,如果能够的话后续节点被设置为head节点,并且调用setHeadAndPropagate,
+//其中又重新会调用doReleaseShared方法,这样就能够在共享模式下面 唤醒CLK多个节点了(只要后继节点在调用tryReleaseShared返回true就OK)
 private void doReleaseShared() {
     //唤醒head的后续节点
     for (;;) {
