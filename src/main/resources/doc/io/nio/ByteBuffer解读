@@ -77,7 +77,7 @@ put* *为其他的基本类型 char short int long float double
 slice
 从原有的ByteBuffer上面部分试图切割出来,切割出来的数据和之前的数据
 是共有一个底层内存的,所以是相互影响的. 切割的部分的position为0,
-limit 和 capacity为之前的remaining
+limit 和 capacity为之前的存在字节的容量
 
 duplicate
 复制之前的ByteBuffer视图,内存块的修改是相互影响的. 新的position,limit,capacity

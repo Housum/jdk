@@ -76,7 +76,7 @@ final void longAccumulate(long x, LongBinaryOperator fn,
                 //如果对于槽位非空的话 重置为没有竞争 下一次将执行cas 增加对应槽位的数值
                 else if (!wasUncontended)       // CAS already known to fail
                     wasUncontended = true;      // Continue after rehash
-                //通过cas的方式重新设置只 如果传入的fn为空的话 那么简单的增加数值就可以了
+                //通过cas的方式重新设置值 如果传入的fn为空的话 那么简单的增加数值就可以了
                 else if (a.cas(v = a.value, ((fn == null) ? v + x :
                                              fn.applyAsLong(v, x))))
                     break;

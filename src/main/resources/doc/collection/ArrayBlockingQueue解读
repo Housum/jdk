@@ -23,7 +23,6 @@ drainTo
 4.数据结构
 
 
-
 1.实现了BlockingQueue,堵塞队列.底层是通过数组的方式实现的,并且是一个固定长度的队列
 一旦我们在构造函数中指定了队列的大小,那么就不能被修改了.实现上主要是使用了显示锁ReentrantLock
 和Condition实现的,详情见《AbstractQueuedSynchronizer解读》.插入数据的时候和消费数据的时候就加独占上锁,

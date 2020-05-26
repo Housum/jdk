@@ -36,7 +36,7 @@ public static final int OP_ACCEPT = 1 << 4;
 这样在之后连接上之后interestOps就包含OP_CONNECT,在客户端连接上之后
 需要调用channel.finishConnect()完成连接 才能进行下一步操作
 
-其中OP_ACCEPT只能在服务端注册,在服务端启动的时候之前需要注册事件
+其中OP_ACCEPT服务端注册, 并且服务端只支持OP_ACCEPT一个参数在服务端启动的时候之前需要注册事件
 这样之后有客户端连接就会被触发interestOps就包含OP_ACCEPT
 
 具体的Channel支持的事件见：java.nio.channels.SelectableChannel.validOps

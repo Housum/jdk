@@ -1,4 +1,4 @@
-ThreadPoolExecutor解读
+ThreadPoolExecutor 解读
 
 1.概述
 1.1 构造函数
@@ -99,7 +99,7 @@ public void execute(Runnable command) {
 
     //3.如果前面都不行的话,那么就直接尝试增加一个线程.如果不能的话 使用rejectHandler拒绝这个任务
     int c = ctl.get();
-    //这里是取出前三位 校验总数是否大于设置的核心线程数
+    //这里是取出后29位 校验总数是否大于设置的核心线程数
     if (workerCountOf(c) < corePoolSize) {
         //如果任务添加成功 工作线程也增加成功 直接返回
         if (addWorker(command, true))
@@ -116,6 +116,7 @@ public void execute(Runnable command) {
         else if (workerCountOf(recheck) == 0)
             addWorker(null, false);
     }
+    //想工作队列添加任务失败 新增任务
     else if (!addWorker(command, false))
         reject(command);
 }
@@ -131,7 +132,7 @@ private boolean addWorker(Runnable firstTask, boolean core) {
 
         // 检查是否能够新增线程
         //1.如果当前的状态是大于SHUTDOWN的(状态越往后 数值越大) 那么是不能新增的线程的
-        //2.处于SHUTDOWN状态 但是新增任务  不允许新增线程
+        //2.处于SHUTDOWN状态 可以新增任务  不允许新增线程
         //3.处于SHUTDOWN状态 当前任务队列workQueue已经没有任务了 那么也不允许新增线程
 
         //1.处于SHUTDOWN之后(STOP,TIDYING,TERMINATED) 那么不允许的添加新的任务的

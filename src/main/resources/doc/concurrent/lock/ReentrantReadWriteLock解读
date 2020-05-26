@@ -1,4 +1,4 @@
-ReentrantReadWriteLock解读
+ReentrantReadWriteLock 解读
 
 1.概述
 2.属性
@@ -12,7 +12,7 @@ ReentrantReadWriteLock解读
 实现了AQS,实现了独占锁和共享锁的两个机制(tryAcquire与tryAcquireShared),那么实现接口定义的规则(在没有写锁的情况下
 可以有多个读锁同时被获取但是写锁不能被获取,当有写锁的情况下是独占的形式)呢?
 答:
-实现层面是通过在states的高16为储存读锁的数量,低16为储存的是写锁的数量,所以在获取锁的时候就可以通过低16位的校验+高16为的
+实现层面是通过在states的高16为储存读锁的数量,低16为储存的是写锁的数量,所以在获取锁的时候就可以通过低16位的校验+高16位的
 校验
 
 2.属性
@@ -145,6 +145,7 @@ abstract static class Sync extends AbstractQueuedSynchronizer {
             return true;
         }
 
+        //共享锁进行释放操作
         protected final boolean tryReleaseShared(int unused) {
             Thread current = Thread.currentThread();
             if (firstReader == current) {
@@ -155,9 +156,11 @@ abstract static class Sync extends AbstractQueuedSynchronizer {
                     firstReaderHoldCount--;
             } else {
                 HoldCounter rh = cachedHoldCounter;
+                //如果缓存为空的话 或者不是当前线程的缓存 那么重新获取
                 if (rh == null || rh.tid != getThreadId(current))
                     rh = readHolds.get();
                 int count = rh.count;
+                //如果已经是做后一次了 那么直接移除了
                 if (count <= 1) {
                     readHolds.remove();
                     if (count <= 0)

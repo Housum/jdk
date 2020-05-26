@@ -60,7 +60,7 @@ private int lockAndDoSelect(long var1) throws IOException {
                 int var10000;
                 synchronized(this.publicKeys) {
                     synchronized(this.publicSelectedKeys) {
-                        //获取触发的事件
+                        //获取触发的事件 子类进行实现
                         var10000 = this.doSelect(var1);
                     }
                 }

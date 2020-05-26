@@ -58,6 +58,7 @@ protected int doSelect(long var1) throws IOException {
             } finally {
                 this.end();
             }
+            //将取消的key进行移除
             this.processDeregisterQueue();
             //这部分才是真正的查询触发的内核事件和注册的事件是否有对于关闭
             //返回的就是锁触发的事件个数

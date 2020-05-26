@@ -12,7 +12,7 @@ AbstractQueuedSynchronizer 解读
 4.2 ConditionObject节点（待填坑）
 5.AQS内部的其他方式
 
-CLK自旋锁：https://www.cnblogs.com/llkmst/p/4895478.html
+CLH自旋锁：https://www.cnblogs.com/llkmst/p/4895478.html
 
 1.鼎鼎大名的AQS,基本上所有的显示锁都是基于它实现的,从这也能猜出实现必定不简单.
 Queued: 队列的
@@ -20,12 +20,12 @@ Synchronizer: 同步器
 对于显示锁满足happen-before原则,所以线程安全的.
 
 2.数据结构
-AQS中维护了一个CLK自旋锁(变种,但是其中的大部分思想是一致的).表现形式就是一个队列,队列的实现方式是双向链表
-其中的首节点第一次初始化为没有意义的Node对象（懒加载的方式初始化CLK）.之后按照队列的FIFO原则加入元素,也就是CLK提供先来先服务的公平性.
+AQS中维护了一个CLH自旋锁(变种,但是其中的大部分思想是一致的).表现形式就是一个队列,队列的实现方式是双向链表
+其中的首节点第一次初始化为没有意义的Node对象（懒加载的方式初始化CLH）.之后按照队列的FIFO原则加入元素,也就是CLH提供先来先服务的公平性.
 对于最后一个加入的元素为尾节点.其中的每个节点的数据结构请见后面分析.
 
-private transient volatile Node head: CLK的首节点,因为根据CLK的定义,必须要有一个首部必须要
-有一个元素,所以在第一次有元素进来的时候,会初始化一个没有意义的节点(CLK中的dummy节点).而第一次插入的节点将是head节点的后续节点,
+private transient volatile Node head: CLH的首节点,因为根据CLH的定义,必须要有一个首部必须要
+有一个元素,所以在第一次有元素进来的时候,会初始化一个没有意义的节点(CLH中的dummy节点).而第一次插入的节点将是head节点的后续节点,
 在插入之后,在满足唤醒条件的话就会按照FIFO的顺序唤醒head后面的线程
 
 private transient volatile Node tail：末尾节点,新增节点都是添加在最后,为了防止并发问题,是通过
@@ -37,18 +37,18 @@ private volatile int state：维护了一个状态,以及提供了这个状态�
 
 3.AQS的实现方式
 通用的几个方法:
-(1).新元素入CLK列队
+(1).新元素入CLH列队
 @param mode: SHARED 共享的模式 EXCLUSIVE：独占的模式
 private Node addWaiter(Node mode) {
     //因为在条件满足的情况下,前置节点需要唤醒后继节点 所以储存线程对象
     //当当前节点能够被唤醒的时候 前置节点通过LockSupport.unpark对当前节点进行唤醒
     Node node = new Node(Thread.currentThread(), mode);
-    //如果已经初始化过了 那么就采用简单的方式将新加入的节点作为CLK的尾节点
+    //如果已经初始化过了 那么就采用简单的方式将新加入的节点作为CLH的尾节点
     Node pred = tail;
     if (pred != null) {
         node.prev = pred;
-        //采用CAS的方式将新插入的节点设置为尾节点  如果发送了并发的情况
-        //那么只能采用enq重试的方式加入到CLK队列
+        //采用CAS的方式将新插入的节点设置为尾节点  如果发生了并发的情况
+        //那么只能采用enq方法重试的方式加入到CLH队列
         if (compareAndSetTail(pred, node)) {
             pred.next = node;
             return node;
@@ -61,13 +61,13 @@ private Node addWaiter(Node mode) {
 private Node enq(final Node node) {
         for (;;) {
             Node t = tail;
-            //如果CLK队列是空的话,那么初始化一个dummy首节点 该节点是没有任何的意义的
             if (t == null) { // Must initialize
+                //如果CLH队列是空的话,那么初始化一个dummy首节点 该节点是没有任何的意义的s
                 if (compareAndSetHead(new Node()))
                     tail = head;
             } else {
                 node.prev = t;
-                //如果CAS设置失败 一直重试 直到成功
+                //将插入的节点设置为tail节点,如果CAS设置失败 一直重试 直到成功
                 if (compareAndSetTail(t, node)) {
                     t.next = node;
                     return t;
@@ -83,15 +83,15 @@ private void unparkSuccessor(Node node) {
     int ws = node.waitStatus;
     if (ws < 0)
         compareAndSetWaitStatus(node, ws, 0);
-    //如果后继节点为空或者被取消了,只要CANCELLED > 0 (在节点被加入到CLK中之后,但是在等待被唤醒的时候
+    //如果后继节点为空或者被取消了,只要CANCELLED > 0 (在节点被加入到CLH中之后,但是在等待被唤醒的时候
     //出现异常才后被取消)
     Node s = node.next;
 
     //如果node节点的后续节点为null 或者被取消了 那么采用不同的一条路径去唤醒后继节点-从tail节点往遍历
-    //直到找到一个能够唤醒的节点
+    //直到找到最前面的那一个能够唤醒的节点
     if (s == null || s.waitStatus > 0) {
         s = null;
-        //从最后一个节点开始往前遍历 直到找到能够唤醒的节点
+        //从最后一个节点开始往前遍历 找到最前面的那个能够唤醒的节点
         for (Node t = tail; t != null && t != node; t = t.prev)
             if (t.waitStatus <= 0)
                 s = t;
@@ -100,7 +100,7 @@ private void unparkSuccessor(Node node) {
         //使用LockSupport进行唤醒
         LockSupport.unpark(s.thread);
 }
-(3).将加入到CLK队列中的元素进行取消
+(3).将加入到CLH队列中的元素进行取消
 private void cancelAcquire(Node node) {
     // Ignore if node doesn't exist
     if (node == null)
@@ -121,15 +121,15 @@ private void cancelAcquire(Node node) {
     node.waitStatus = Node.CANCELLED;
 
 
-    //如果取消的节点是尾部节点,那么将尾节点设置为尾节点的前置节点 如果这个时候出现并发的情况(新设置了新的尾节点)
+    //如果取消的节点是尾部节点,那么将尾节点设置为尾节点(node节点)的前置节点 如果这个时候出现并发的情况(新设置了新的尾节点)
     //那么将会出现失败 else中将会处理这种情况
     if (node == tail && compareAndSetTail(node, pred)) {
         //因为取消节点为尾节点 在第一步已经将取消节点的前置节点设置为了尾节点
         //这一步就是将新的尾节点的后置节点设置为null 成功与否不会造成影响
         compareAndSetNext(pred, predNext, null);
     } else {
-       //如果是在判断前(node == tail) 就插入到了CLK队列中,那么就将
-       //CLK链表跳过取消的节点,或者直接唤醒取消节点的后继节点
+       //如果是在判断前(node == tail) 就有新的节点插入到了CLH队列中,那么就将
+       //CLH链表跳过取消的节点,或者直接唤醒取消节点的后继节点
         int ws;
         if (pred != head &&
             ((ws = pred.waitStatus) == Node.SIGNAL ||
@@ -181,18 +181,19 @@ private static boolean shouldParkAfterFailedAcquire(Node pred, Node node) {
 (2).protected boolean tryRelease(int arg)
 子类需要实现的方法,表示线程释放资源,如果返回true则表示将acquire中加入到队列中的线程
 给唤醒或者当前的线程能够获得资源
-(3).获取锁
-public final void acquire(int arg) {
     //这就是(2)中锁提到的 如果tryAcquire返回了true,那么表明当前的线程能够获得的锁
 
    //在tryAcquire中可以实现两种方式的锁
-   //公平的独占锁 在实现的时候 首先判断是否能够获得资源(通过state能够知道),同时判断CLK中
+   //公平的独占锁 在实现的时候 首先判断是否能够获得资源(通过state能够知道),同时判断CLH中
    //是否已经有任务在其中了,如果有的话 那么返回false,就会知道半部分逻辑
 
-   //非公平的独占锁 在实现的时候 首先判断是否能够获得资源(通过state能够知道),不需要对CLK中的队列
-   //进行判断 这样的话 就不是FIFO执行加入的线程了
+   //非公平的独占锁 在实现的时候 首先判断是否能够获得资源(通过state能够知道),不需要对CLH中的队列
+   //进行判断 这样的话
+(3).获取锁
+public final void acquire(int arg) {就不是FIFO执行加入的线程了
 
     //see ReentrantLock 公平锁和非公平锁的实现
+    //如果tryAcquire返回true的话 那么直接就能获取到锁了
     if (!tryAcquire(arg) &&
         acquireQueued(addWaiter(Node.EXCLUSIVE), arg))
         //将线程的中断状态设置为true
@@ -207,7 +208,7 @@ final boolean acquireQueued(final Node node, int arg) {
         boolean interrupted = false;
         for (;;) {
             final Node p = node.predecessor();
-            //如果前置节点是首节点,那么重新获取资源看是否能获取到资源(如果此时是非公平锁,还是有可能获取失败)
+            //如果插入的节点经过一段时间前置节点变为了首节点,那么重新获取资源看是否能获取到资源(如果此时是非公平锁,还是有可能获取失败)
             //如果获的锁 那么当前节点设置为了head节点 并且获得了锁资源
             if (p == head && tryAcquire(arg)) {
                 //因为head都是持有锁的节点
@@ -277,6 +278,7 @@ public final boolean release(int arg) {
     //如果能够释放的话 那么拿到head节点之后检查状态,如果非0的话(0表示唤醒过后继节点了),唤醒后继节点
     if (tryRelease(arg)) {
         Node h = head;
+        //在h.waitStatus != 0
         if (h != null && h.waitStatus != 0)
             //唤醒后继节点
             unparkSuccessor(h);
@@ -290,7 +292,7 @@ public final boolean release(int arg) {
 共享锁的实现
 (1).protected int tryAcquireShared(int arg) 子类需要实现的
 当返回大于等于0的时候 表示存在资源 那么能够获取到资源,如果小于0则表示不能够获取到资源,那么线程将会被加入到
-CLK队列中,当其他线程释放资源的时候,就会按照head的后续节点一直往后传播让它们重新尝试是否能够获得到锁
+CLH队列中,当其他线程释放资源的时候,就会按照head的后续节点一直往后传播让它们重新尝试是否能够获得到锁
 (2).protected boolean tryReleaseShared(int arg) 子类需要实现的
 当返回true的时候(这个时候一般都会操作state 控制其状态,使其他堵塞的节点能够获取到资源)就按照head的后继节点的
 按照FIFO的规则往后测试是否能够获取到资源,如果能够获取到资源那么一直往后遍历,直到不能够获取到资源为止.
@@ -302,7 +304,7 @@ public final void acquireShared(int arg) {
         doAcquireShared(arg);
 }
 private void doAcquireShared(int arg) {
-    //将共享模式的节点加入到CLK队列中
+    //将共享模式的节点加入到CLH队列中
     final Node node = addWaiter(Node.SHARED);
     boolean failed = true;
     try {
@@ -366,7 +368,7 @@ public final boolean releaseShared(int arg) {
 }
 //这个方法需要结合doAcquireShared和其中的setHeadAndPropagate方法一起看,如果在该方法中head节点的后继节点被唤醒之后,在doAcquireShared
 //中再次通过tryReleaseShared判断后继节点是否能够获取到资源,如果能够的话后续节点被设置为head节点,并且调用setHeadAndPropagate,
-//其中又重新会调用doReleaseShared方法,这样就能够在共享模式下面 唤醒CLK多个节点了(只要后继节点在调用tryReleaseShared返回true就OK)
+//其中又重新会调用doReleaseShared方法,这样就能够在共享模式下面 唤醒CLH多个节点了(只要后继节点在调用tryReleaseShared返回true就OK)
 private void doReleaseShared() {
     //唤醒head的后续节点
     for (;;) {
@@ -396,7 +398,7 @@ private void doReleaseShared() {
 4.内部类：
 
 (1).Node
-CLK 的节点,数据结构
+CLH 的节点,数据结构
 volatile int waitStatus:
 节点所以的状态
 SIGNAL : 这个状态的节点说明它的后续节点需要被唤醒,一般出现的情况就是执行release*方法之后,将会
@@ -424,23 +426,23 @@ public final void await() throws InterruptedException {
        //这是可中断的功能
         if (Thread.interrupted())
             throw new InterruptedException();
-        //将condition节点加入到队列中(非CLK 而是condition维护的一个链表
-        //这个链表在之后调用signal的时候将会同步到CLK队列中)
+        //将condition节点加入到队列中(非CLH 而是condition维护的一个链表
+        //这个链表在之后调用signal的时候将会同步到CLH队列中)
         Node node = addConditionWaiter();
         //这里会将独占锁资源给释放掉 其他的独占锁就能够获得资源了(否则其他的线程就不能获得锁了,也就不能调用
         //signal了)
         int savedState = fullyRelease(node);
         int interruptMode = 0;
-        //如果当前线程的节点不在同步队列中(CLK队列中)
+        //如果当前线程的节点不在同步队列中(CLH队列中)
         while (!isOnSyncQueue(node)) {
             //将其红堵塞 直到被唤醒或者被中断
             LockSupport.park(this);
             //注意这里 如果非中断的话 那么从重新做while的逻辑 如果这个时候已经
-            //将其放入到了CLK队列中了
+            //将其放入到了CLH队列中了 那么就不会做跳出这段循环了
             if ((interruptMode = checkInterruptWhileWaiting(node)) != 0)
                 break;
         }
-        //当前线程节点已经被加入到同步队列CLK中了(signal方法被调用的时候会把链表的元素都加入
+        //当前线程节点已经被加入到同步队列CLH中了(signal方法被调用的时候会把链表的元素都加入
         //进去 见后面signal分析),因为有可能会有很多的线程在await 所以即使被唤醒还是需要进行争夺资源,见：acquireQueued分析
         //acquireQueued只有在中断返回的时候才返回true 这样需要中断状态校验
         if (acquireQueued(node, savedState) && interruptMode != THROW_IE)
@@ -452,7 +454,7 @@ public final void await() throws InterruptedException {
         if (interruptMode != 0)
             reportInterruptAfterWait(interruptMode);
 
-        //在后面的逻辑中是lock.release 所以就唤醒当前node的下一个线程节点(针对于signalAll就是唤醒下一个链表转移到CLK队列中的元素,一直唤醒所有的节点)
+        //在后面的逻辑中是lock.release 所以就唤醒当前node的下一个线程节点(针对于signalAll就是唤醒下一个链表转移到CLH队列中的元素,一直唤醒所有的节点)
 }
 (2).唤醒其中的一个线程
 public final void signal() {
@@ -462,9 +464,9 @@ public final void signal() {
     //拿到await在上面的原有节点 是通过链表的方式进行保存的
     Node first = firstWaiter;
     if (first != null)
-        //这一部分是将链表的所有元素都加入到CLK中 并且加入之后将前置节点设置为
-        //(节点属性有解释,当节点为head节点之后并且属性为SIGNAL的时候,可以唤醒后置节点),在这一步虽然将所有的节点都加入到CLK中之后,这些节点并不能获得
-        //任务的资源,只有在lock的release之后,然后await方法中 "if (acquireQueued(node, savedState) && interruptMode != THROW_IE)"的"acquireQueued(node, savedState)"
+        //这一部分是将链表的所有元素都加入到CLH中 并且加入之后将前置节点设置为
+        //(节点属性有解释,当节点为head节点之后并且属性为SIGNAL的时候,可以唤醒后置节点),在这一步虽然将所有的节点都加入到CLH中之后,这些节点并不能获得
+        //任务的资源,只有在lock的release之后(因为这个时候才会有资源),然后await方法中 "if (acquireQueued(node, savedState) && interruptMode != THROW_IE)"的"acquireQueued(node, savedState)"
         //开始检测是否能够获得锁
         doSignal(first);
 }
@@ -485,7 +487,7 @@ final boolean transferForSignal(Node node) {
     if (!compareAndSetWaitStatus(node, Node.CONDITION, 0))
         return false;
 
-    //加入到CLK队列中 如果前置节点为head节点的时候 该node节点就能够被唤醒了
+    //加入到CLH队列中 如果前置节点为head节点的时候 该node节点就能够被唤醒了
     Node p = enq(node);
     int ws = p.waitStatus;
     //如果前置节点已经被取消了 或者设置为SIGNAL失败 那么直接将该节点唤醒
@@ -509,7 +511,7 @@ private void doSignalAll(Node first) {
     do {
         Node next = first.nextWaiter;
         first.nextWaiter = null;
-        //这里将所有的节点都加入到CLK队列中,当release的时候,全部被唤醒
+        //这里将所有的节点都加入到CLH队列中,当release的时候,全部被唤醒
         transferForSignal(first);
         first = next;
     } while (first != null);
@@ -523,13 +525,13 @@ public final Collection<Thread> getExclusiveQueuedThreads()
 返回独占模式下 等待的线程
 
 public final Thread getFirstQueuedThread()
-获取在CLK队列中等待最久的元素,一般都是head的next元素
+获取在CLH队列中等待最久的元素,一般都是head的next元素
 
 public final Collection<Thread> getQueuedThreads()
-返回CLK中的所有线程
+返回CLH中的所有线程
 
 public final int getQueueLength()
-返回CLK队列的长度
+返回CLH队列的长度
 
 public final Collection<Thread> getSharedQueuedThreads()
 返回共享锁下的等待线程

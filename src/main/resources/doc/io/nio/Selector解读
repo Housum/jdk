@@ -1,6 +1,9 @@
 Selector解读
 
-1.NIO中的多路复用器,其中一个能够Selector能够处理多个连接,这也是NIO中的精髓
+CPU100% BUG:https://bugs.java.com/bugdatabase/view_bug.do?bug_id=6403933
+
+
+1.NIO中的多路复用器,其中一个Selector能够处理多个连接,这也是NIO中的精髓
 通过open方法或者通过SelectorProvider的provider()方法进行创建
 
 SelectableChannel通过register方法将连接以及连接感兴趣的事件注册到selector上面
@@ -38,6 +41,7 @@ public abstract Set<SelectionKey> selectedKeys()
 返回的是感兴趣的事件被触发的数量 如果为0 那么说明没有事件被触发
 public abstract int selectNow() throws IOException
 
+//这里会可能出现CPU 100% 的BUG
 这是一个堵塞一段时间的方法 超时如果还没有感兴趣的事件被触发 返回0
 public abstract int select(long timeout)
 

@@ -1,7 +1,7 @@
 ConcurrentHashMap解读
 
 1. 提供了并发能力的hashmap,对于所有的事务操作都具有原子性.JAVA7与JAVA8实现上有很大的不同点,7使用的是
-分段锁的方式，而8废弃了这种方式,采用的是大部分的操作都是使用的CAS+ volatile 的方式进行设置,所以可以看到
+分段锁的方式，而8废弃了这种方式,采用的是大部分的操作都是使用的CAS + volatile 的方式进行设置,所以可以看到
 在ConcurrentHashMap中的所有元素都是使用的volatile修饰的
 
 具体分析参考：http://www.importnew.com/29832.html
@@ -10,7 +10,7 @@ ConcurrentHashMap解读
 2.关键的一些属性分析
 
 transient volatile Node<K,V>[] table
-储存元素的数组,使用的volatile,对其中的操作是勇敢CAS的方式进行的
+储存元素的数组,使用的volatile,对其中的操作是用CAS的方式进行的
 
 private transient volatile Node<K,V>[] nextTable
 这个属性只在扩容的时候就存在,暂时存储扩容转移的元素,当扩容完成之后 将其赋值给table
@@ -33,7 +33,7 @@ private transient volatile int cellsBusy
 private transient volatile CounterCell[] counterCells
 map中的总数 当没有竞争的时候 使用的是baseCount进行统计 但是如果出现竞争的时候
 那么采用CounterCell进行统计 CounterCell保存的是一段总数 总数就是将这些全部加起来
-
+见《Striped64解读》
 
 3.代码分析
 代码分析将会分为 创建 新增元素 扩容 查找 删除 几个步骤
@@ -110,9 +110,10 @@ final V putVal(K key, V value, boolean onlyIfAbsent) {
                 //当hash冲突的情况下 对头元素进行加锁 所以对于ConcurrentHashMap还是
                 //存在独占锁的情况的
                 synchronized (f) {
+                    //做这一步是为了防止元素被并发的修改或者删除了
                     if (tabAt(tab, i) == f) {
 
-                        //如果这里大于0 那么表示的是链表 小于0表示的是
+                        //如果这里大于0 那么表示不是树结构或者转移节点 小于0表示的是
                         //树结构 或者扩容相关
                         if (fh >= 0) {
                             binCount = 1;
@@ -136,7 +137,6 @@ final V putVal(K key, V value, boolean onlyIfAbsent) {
                                 }
                             }
                         }
-
                         //如果是一个树节点 那么从红黑树中进行查找
                         else if (f instanceof TreeBin) {
                             Node<K,V> p;
@@ -152,11 +152,13 @@ final V putVal(K key, V value, boolean onlyIfAbsent) {
                 }
 
                 //binCount是为了统计hash冲突的个数的 如果大于TREEIFY_THRESHOLD 那么将链表进行
-                //数化为红黑树
+
                 if (binCount != 0) {
                     if (binCount >= TREEIFY_THRESHOLD)
+                        //数化为红黑树
                         treeifyBin(tab, i);
                     if (oldVal != null)
+                        //替换的情况 不需要计数
                         return oldVal;
                     break;
                 }
@@ -277,7 +279,7 @@ private final void transfer(Node<K,V>[] tab, Node<K,V>[] nextTab) {
             nextTable = nextTab;
             //这个transferIndex讲解属性的时候讲过 但是还是需要重新讲讲
             //这个属性表示的是下一个分段的开始位置,是从末尾开始的 假设现在10个元素为单位 那么
-            //分段就是 [transferIndex-10,transferIndex),[transferIndex-20,transferIndex) 以此类推,一个线程处理一个或者多个
+            //分段就是 [transferIndex-10,transferIndex),[transferIndex-20,transferIndex-10) 以此类推,一个线程处理一个或者多个
             transferIndex = n;
         }
         int nextn = nextTab.length;
@@ -285,14 +287,16 @@ private final void transfer(Node<K,V>[] tab, Node<K,V>[] nextTab) {
         //ForwardingNode再去查询元素
         ForwardingNode<K,V> fwd = new ForwardingNode<K,V>(nextTab);
 
-        //该变量表示判断是否还需要判断是否需要处理分段,在一个线程处理完成一个分段之后 可能还会处理第二个分段
+        //该变量含义: 判断是否还需要继续处理分段,在一个线程处理完成一个分段之后 可能还会处理第二个分段
+        //，第三个分段等等
         boolean advance = true;
         //是否已经完全转移 如果已经完全转移的话 那么将nextTab赋值给tab 完成分配任务
         boolean finishing = false; // to ensure sweep before committing nextTab
 
-        i表示的是分段的最后的一个元素 而bound表示的是分段的第一个元素
+        //从数组角度来看,这个分段就是arr[bound,...,i]
         for (int i = 0, bound = 0;;) {
             Node<K,V> f; int fh;
+            //这部分做的是给线程分配段
             while (advance) {
                 int nextIndex, nextBound;
                 //--i 很关键. 从i开始一直到bound 这部分是一个分段 由一个线程负责将其转移到nextTab中(这部分一一替换为ForwardingNode)
@@ -306,11 +310,8 @@ private final void transfer(Node<K,V>[] tab, Node<K,V>[] nextTab) {
                     advance = false;
                 }
 
-                //这部分做的逻辑就是分配一个段从(nextBound,nextIndex)
-                else if (U.compareAndSwapInt
-                         (this, TRANSFERINDEX, nextIndex,
-                          nextBound = (nextIndex > stride ?
-                                       nextIndex - stride : 0))) {
+                //这部分做的逻辑就是分配给当前线程一个新的段进行转移,分配的区间就是:(nextBound,nextIndex)
+                else if (U.compareAndSwapInt (this, TRANSFERINDEX, nextIndex,nextBound = (nextIndex > stride ? nextIndex - stride : 0))) {
                     bound = nextBound;
                     //数组索引是从0开始的 所以需要减1
                     i = nextIndex - 1;

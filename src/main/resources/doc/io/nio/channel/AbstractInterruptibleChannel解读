@@ -85,7 +85,7 @@ protected final void end(boolean completed)
             //抛出异常
             throw new ClosedByInterruptException();
         }
-        //如果没有操作完成的话 那么抛出AsynchronousCloseException
+        //如果没有操作完成并且被关闭了的话 那么抛出AsynchronousCloseException
         if (!completed && !open)
             throw new AsynchronousCloseException();
 }

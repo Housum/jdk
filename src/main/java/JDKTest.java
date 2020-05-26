@@ -1,8 +1,11 @@
 import sun.misc.Unsafe;
 import sun.reflect.ConstantPool;
 
+import javax.management.MBeanServer;
+import javax.management.ObjectName;
 import java.io.*;
 import java.lang.annotation.*;
+import java.lang.management.ManagementFactory;
 import java.lang.ref.PhantomReference;
 import java.lang.ref.Reference;
 import java.lang.ref.ReferenceQueue;
@@ -66,7 +69,9 @@ public class JDKTest<K extends Object & Map, V> implements Serializable {
         return (n < 0) ? 1 : (n >= (1 << 30)) ? (1 << 30) : n + 1;
     }
 
+
     public static void main(String[] args) throws Throwable {
+
         // testMap();
         // testCollections();
         // testType();
@@ -240,7 +245,7 @@ public class JDKTest<K extends Object & Map, V> implements Serializable {
 
 //        testReentrantLockInterrupt();
 
-        testAQSCondition();
+//        testAQSCondition();
 
 //        testPrintThreadPoolStatus();
 
@@ -267,6 +272,221 @@ public class JDKTest<K extends Object & Map, V> implements Serializable {
 //
 //
 //        TimeUnit.SECONDS.sleep(1000);
+
+//        testForkJoin();
+//        testJMX();
+
+//
+//        int count = 10000;
+//        final Map<Integer, Integer> intMap = new HashMap<>(count);
+//        for (int i = 0; i < count; i++) {
+//            intMap.put(i, i);
+//        }
+//
+//        CountDownLatch countDownLatch = new CountDownLatch(count);
+//        ExecutorService executorService = Executors.newFixedThreadPool(8);
+//        for (int i = 0; i < count; i++) {
+//            final Integer a = i;
+//            executorService.execute(() -> {
+//                synchronized (intMap){
+//                    intMap.remove(a);
+//                }
+//                countDownLatch.countDown();
+//            });
+//        }
+//
+//        countDownLatch.await();
+//        executorService.shutdown();
+//        System.out.println(intMap.size());
+
+//        ByteBuffer byteBuffer = ByteBuffer.allocate(1024);
+//        byteBuffer.put("123".getBytes());
+//        ByteBuffer  byteBuffer1 = byteBuffer.slice();
+//        byteBuffer1.position(0);
+//        byteBuffer1.put("456".getBytes());
+//        byteBuffer.flip();
+
+
+//        CyclicBarrier cyclicBarrier = new CyclicBarrier(4);
+//        cyclicBarrier.await();
+
+    }
+
+
+    private int longestSubStr(String s) {
+        char[] chars = s.toCharArray();
+        Map<Character, Integer> longMap = new HashMap<>(128);
+        int maxLength = 0;
+        int start = -1;
+
+        for (int i = 0; i < chars.length; i++) {
+            if (longMap.get(chars[i]) != null && longMap.get(chars[i]) > start) {
+                start = longMap.get(chars[i]);
+            }
+            longMap.put(chars[i], i);
+            maxLength = Math.max(maxLength, i - start);
+        }
+        return maxLength;
+    }
+
+
+    private Node reverse(Node head) {
+        if (head == null || head.next == null) {
+            return head;
+        }
+        Node cur = head;
+        Node next = cur.next;
+        Node tmp = null;
+        while (next != null) {
+            tmp = next.next;
+            next.next = cur;
+            cur = next;
+            next = tmp;
+        }
+        head.next = null;
+        return cur;
+    }
+
+    private int search(int[] args, int val) {
+
+        int start = 0;
+        int end = args.length - 1;
+        while (start < end) {
+            int mid = (end + start) / 2 + 1;
+            if (args[mid] == val) {
+                return val;
+            } else if (args[mid] > val) {
+                end = mid - 1;
+            } else {
+                start = mid + 1;
+            }
+        }
+        return -1;
+    }
+
+    public Node merge(Node head1, Node head2) {
+        Node head = new Node();
+        Node tmpHead = head;
+
+        while (head1 != null && head2 != null) {
+            if (head1.val > head2.val) {
+                head.next = head1;
+                head1 = head1.next;
+            } else {
+                head.next = head2;
+                head2 = head2.next;
+            }
+            head = head.next;
+        }
+        if (head1 != null) {
+            head.next = head1;
+        }
+        if (head2 != null) {
+            head.next = head2;
+        }
+        return tmpHead;
+    }
+
+    private Node mergeKNodes(List<Node> kNodes) {
+        if (kNodes == null) {
+            return null;
+        }
+        if (kNodes.size() == 1) {
+            return kNodes.get(0);
+        }
+        if (kNodes.size() == 2) {
+            return merge(kNodes.get(0), kNodes.get(1));
+        }
+        int mid = kNodes.size() / 2;
+
+        List<Node> l1 = new ArrayList<>();
+        List<Node> l2 = new ArrayList<>();
+
+        for (int i = 0; i < mid; i++) {
+            l1.add(kNodes.get(i));
+        }
+        for (int i = mid; i < kNodes.size(); i++) {
+            l2.add(kNodes.get(i));
+        }
+        Node n1 = mergeKNodes(l1);
+        Node n2 = mergeKNodes(l2);
+
+        return merge(n1, n2);
+    }
+
+
+    private class Node {
+        public int val;
+        public Node next;
+    }
+
+    public interface HelloMBean {
+        String getName();
+
+        void setName(String name);
+    }
+
+    public static class Hello implements HelloMBean {
+        private String name = "empty";
+
+        @Override
+        public String getName() {
+            log("get name ");
+            return name;
+        }
+
+        @Override
+        public void setName(String name) {
+            log("set name ");
+            this.name = name;
+        }
+    }
+
+    public static void testJMX() throws Exception {
+
+        MBeanServer mBeanServer = ManagementFactory.getPlatformMBeanServer();
+        ObjectName objectName = new ObjectName("test:name=hello");
+        mBeanServer.registerMBean(new Hello(), objectName);
+        TimeUnit.SECONDS.sleep(1000);
+    }
+
+    public static void testForkJoin() throws Exception {
+
+        ForkJoinPool forkJoinPool = new ForkJoinPool();
+        Future<Integer> integerFuture = forkJoinPool.submit(new CountTask(1, 100000));
+        Integer integer = integerFuture.get();
+        log("integer = " + integer);
+
+    }
+
+    private static class CountTask extends RecursiveTask<Integer> {
+        private static final long serialVersionUID = 1L;
+        private static final int THRESHOLD = 2;
+        private int start;
+        private int end;
+
+        public CountTask(int start, int end) {
+            this.start = start;
+            this.end = end;
+        }
+
+        @Override
+        protected Integer compute() {
+            int sum = 0;
+            if ((end - start) <= THRESHOLD) {
+                for (int i = start; i <= end; i++) {
+                    sum += i;
+                }
+            } else {
+                int middle = (start + end) / 2;
+                CountTask subTask = new CountTask(start, middle);
+                CountTask subTask1 = new CountTask(middle + 1, end);
+                subTask.fork();
+                subTask1.fork();
+                sum = subTask.join() + subTask1.join();
+            }
+            return sum;
+        }
     }
 
 
@@ -284,13 +504,13 @@ public class JDKTest<K extends Object & Map, V> implements Serializable {
             public void completed(AsynchronousSocketChannel socketChannel, Object attachment) {
                 log("accept completed");
 
-                ByteBuffer byteBuffer =ByteBuffer.allocate(1024);
+                ByteBuffer byteBuffer = ByteBuffer.allocate(1024);
                 socketChannel.read(byteBuffer, byteBuffer, new CompletionHandler<Integer, ByteBuffer>() {
                     @Override
                     public void completed(Integer result, ByteBuffer buffer) {
                         log("read completed");
                         buffer.flip();
-                        log("这是服务端读到的信息:" + new String(buffer.array(),0,buffer.remaining()));
+                        log("这是服务端读到的信息:" + new String(buffer.array(), 0, buffer.remaining()));
                         buffer.clear();
                         buffer.put("这是服务端的信息".getBytes());
                         buffer.flip();
@@ -304,9 +524,8 @@ public class JDKTest<K extends Object & Map, V> implements Serializable {
                 });
 
 
-
-
             }
+
             @Override
             public void failed(Throwable exc, Object attachment) {
 
@@ -334,7 +553,7 @@ public class JDKTest<K extends Object & Map, V> implements Serializable {
                     public void completed(Integer result, ByteBuffer buffer) {
                         log("read completed");
                         buffer.flip();
-                        log("这是客户端读到的信息:" + new String(buffer.array(),0,buffer.remaining()));
+                        log("这是客户端读到的信息:" + new String(buffer.array(), 0, buffer.remaining()));
                         buffer.clear();
 
                         byteBuffer.put("这是客户端的消息1".getBytes());
@@ -349,12 +568,12 @@ public class JDKTest<K extends Object & Map, V> implements Serializable {
                     }
                 });
             }
+
             @Override
             public void failed(Throwable exc, Object attachment) {
 
             }
         });
-
 
 
     }
@@ -1348,38 +1567,39 @@ public class JDKTest<K extends Object & Map, V> implements Serializable {
     }
 
 
-    public static void testParameterizedType() throws Exception {
-        Method method = JDKTest.class.getMethod("method1", List.class);
-        Type[] types = method.getGenericParameterTypes();
-        if (types[0] instanceof ParameterizedType) {
-            ParameterizedType pt = (ParameterizedType) types[0];
-            types = pt.getActualTypeArguments();
-            for (Type type : types) {
-                System.out.println(type); //class java.lang.String
-            }
-
-            if (types[0] instanceof Class) {
-                Class clazz = (Class) types[0];
-                System.out.println(clazz.getName()); //java.lang.String
-            }
-
-            Type type = pt.getRawType();
-            if (type instanceof Class) {
-                System.out.println(((Class) type).getName()); //java.util.List
-            }
-        }
-
-
-        method = JDKTest.class.getMethod("method2", Map.Entry.class);
-        types = method.getGenericParameterTypes();
-
-
-        ParameterizedType type = (ParameterizedType) types[0];
-        Type type1 = type.getOwnerType();
-        if (type1 instanceof Class) {
-            System.out.println(((Class) type1).getName());//java.util.Map
-        }
-    }
+//    public static void testParameterizedType() throws Exception {
+//        Method method = JDKTest.class.getMethod("method1", List.class);
+//        Type[] types = method.
+//        ();
+//        if (types[0] instanceof ParameterizedType) {
+//            ParameterizedType pt = (ParameterizedType) types[0];
+//            types = pt.getActualTypeArguments();
+//            for (Type type : types) {
+//                System.out.println(type); //class java.lang.String
+//            }
+//
+//            if (types[0] instanceof Class) {
+//                Class clazz = (Class) types[0];
+//                System.out.println(clazz.getName()); //java.lang.String
+//            }
+//
+//            Type type = pt.getRawType();
+//            if (type instanceof Class) {
+//                System.out.println(((Class) type).getName()); //java.util.List
+//            }
+//        }
+//
+//
+//        method = JDKTest.class.getMethod("method2", Map.Entry.class);
+//        types = method.getGenericParameterTypes();
+//
+//
+//        ParameterizedType type = (ParameterizedType) types[0];
+//        Type type1 = type.getOwnerType();
+//        if (type1 instanceof Class) {
+//            System.out.println(((Class) type1).getName());//java.util.Map
+//        }
+//    }
 
     public static void testTypeVariable() {
 

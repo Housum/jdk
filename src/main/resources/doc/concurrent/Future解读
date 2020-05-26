@@ -12,8 +12,7 @@ boolean cancel(boolean mayInterruptIfRunning);
 //任务是否被取消了
 boolean isCancelled();
 
- // 任务是否完成了 注意：完成代表成功. 任务被取消,任务出现一次,或者成功
-//计算完成了 都返回done
+ // 任务是否完成了 注意：完成代表成功;任务被取消;任务出现异常;或者成功计算完成了 都返回done
 boolean isDone();
 
 //等待计算结果 能够被中断
